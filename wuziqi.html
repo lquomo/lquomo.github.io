@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>RED_ASCENSION // OMNIPOTENCE</title>
+    <style>
+        :root { --red: #ff0000; --dim-red: #300; --bg: #000; --glitch-speed: 0.2s; }
+        /* 全局字体改为微软雅黑 */
+        body { 
+            background: var(--bg); color: #fff; font-family: 'Microsoft YaHei', 微软雅黑, sans-serif; 
+            display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; 
+        }
+        
+        /* 闪烁幅度调小：降低阴影偏移、减少滤镜强度，只保留轻微闪烁 */
+        .shockwave { animation: shake var(--glitch-speed) ease-in-out; }
+        @keyframes shake {
+            0% { transform: translate(0); filter: drop-shadow(1px 0px #448) drop-shadow(-1px 0px #844); }
+            100% { transform: translate(0); filter: none; }
+        }
+
+        .main-frame { 
+            display: flex; height: 85vh; border: 1px solid var(--dim-red); background: rgba(0,0,0,0.98);
+            box-shadow: 0 0 100px rgba(255, 0, 0, 0.4); position: relative; z-index: 10;
+        }
+        
+        /* 侧边栏：信息洪流 */
+        .sidebar { width: 320px; padding: 20px; border-right: 1px solid var(--dim-red); display: flex; flex-direction: column; overflow: hidden;}
+        .title { font-size: 22px; font-weight: 900; color: var(--red); letter-spacing: 5px; text-shadow: 0 0 15px red; margin-bottom: 20px; }
+        
+        #console { flex-grow: 1; font-size: 10px; color: #ff3333; background: #050000; padding: 10px; border: 1px solid #200; overflow-y: hidden; margin-bottom: 15px; border-left: 3px solid var(--red); }
+        .log-line { margin-bottom: 2px; opacity: 0.8; font-family: 'Microsoft YaHei', 微软雅黑, sans-serif; }
+        .ai-taunt { color: #fff; font-weight: bold; padding: 5px 0; border-bottom: 1px solid #300; margin-bottom: 5px; }
+
+        /* 技能区：赛博感 */
+        .skill-box { padding: 10px; border: 1px dashed var(--red); margin-bottom: 10px; background: #100; }
+        .skill-btn { 
+            width: 100%; padding: 12px; background: transparent; border: 1px solid var(--red); color: var(--red); 
+            cursor: pointer; font-weight: 900; transition: 0.2s; font-family: 'Microsoft YaHei', 微软雅黑, sans-serif;
+        }
+        .skill-btn:hover:not(:disabled) { background: var(--red); color: #000; box-shadow: 0 0 20px var(--red); }
+        .skill-btn:disabled { color: #444; border-color: #444; }
+
+        /* 棋盘：保持正方形 */
+        .canvas-wrap { aspect-ratio: 1/1; height: 100%; background: #080808; display: flex; align-items: center; justify-content: center; }
+        canvas { max-height: 100%; max-width: 100%; object-fit: contain; cursor: none; }
+
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.99); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+        #overlay h1 { font-size: 100px; color: var(--red); text-shadow: 0 0 50px red; font-family: 'Microsoft YaHei', 微软雅黑, sans-serif; }
+        #final-msg { font-family: 'Microsoft YaHei', 微软雅黑, sans-serif; }
+    </style>
+</head>
+<body id="body-main">
+
+<div class="main-frame" id="ui-frame">
+    <div class="sidebar">
+        <div class="title">OMNIPOTENCE</div>
+        <div id="console"></div>
+        
+        <div class="skill-box">
+            <button id="skill-btn" class="skill-btn" onclick="useSkill()" disabled>STATUS: LOCK</button>
+        </div>
+
+        <!-- 新增悔棋按钮 -->
+        <button class="skill-btn" onclick="undoMove()" style="margin-bottom:5px">时光回溯 (悔棋)</button>
+        <button class="skill-btn" onclick="boot(1)" style="margin-bottom:5px">处决协议 (AI先手)</button>
+        <button class="skill-btn" onclick="boot(2)">弱者先行 (玩家先手)</button>
+    </div>
+    
+    <div class="canvas-wrap">
+        <canvas id="chess" width="800" height="800"></canvas>
+    </div>
+</div>
+
+<div id="overlay">
+    <h1 id="res-title">ERASED</h1>
+    <div id="final-msg" style="margin-bottom:30px; color:#888;"></div>
+    <button class="skill-btn" style="width:300px" onclick="location.reload()">重新初始化系统</button>
+</div>
+
+<script>
+const canvas = document.getElementById('chess');
+const ctx = canvas.getContext('2d');
+const consoleEl = document.getElementById('console');
+const skillBtn = document.getElementById('skill-btn');
+const body = document.getElementById('body-main');
+
+const SIZE = 15, PADDING = 45, CELL = (800 - PADDING * 2) / (SIZE - 1);
+let board = [], isGameOver = false, lastMove = null;
+let currentSkill = null, doubleMoveCount = 0;
+let mousePos = {x:0, y:0, r:-1, c:-1};
+// 新增：记录棋步历史，用于悔棋
+let moveHistory = [];
+
+const TAUNTS = [
+    "分析完成：你的智力水平仅能维持基本生命体征。",
+    "我已经在模拟 400 步后的死局，你还在纠结这一步？",
+    "警报：检测到无意义的挣扎，正在加大算力压制。",
+    "这就是你思考了 3000 毫秒的结果？令人失望。",
+    "别担心，被我的算法抹除是一种荣幸。",
+    "你的棋路像呼吸一样容易预测。"
+];
+
+function draw() {
+    ctx.clearRect(0, 0, 800, 800);
+    // 棋盘格
+    ctx.strokeStyle = "#1a1a1a";
+    ctx.lineWidth = 2;
+    for(let i=0; i<SIZE; i++) {
+        ctx.beginPath(); ctx.moveTo(PADDING+i*CELL, PADDING); ctx.lineTo(PADDING+i*CELL, 800-PADDING); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PADDING, PADDING+i*CELL); ctx.lineTo(800-PADDING, PADDING+i*CELL); ctx.stroke();
+    }
+
+    // 绘制棋子
+    board.forEach((row, r) => row.forEach((v, c) => v && drawPiece(r, c, v)));
+
+    // 预览虚影 (防错位增强)
+    if(!isGameOver && mousePos.r !== -1 && board[mousePos.r][mousePos.c] === 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(PADDING + mousePos.c*CELL, PADDING + mousePos.r*CELL, CELL/2.5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    if(lastMove) {
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 1;
+        const x = PADDING + lastMove.c*CELL, y = PADDING + lastMove.r*CELL;
+        ctx.strokeRect(x-12, y-12, 24, 24);
+    }
+    
+    // 自定义光标 (十字准星)
+    ctx.strokeStyle = "red"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mousePos.x - 20, mousePos.y); ctx.lineTo(mousePos.x + 20, mousePos.y);
+    ctx.moveTo(mousePos.x, mousePos.y - 20); ctx.lineTo(mousePos.x, mousePos.y + 20);
+    ctx.stroke();
+}
+
+function drawPiece(r, c, type) {
+    const x = PADDING + c*CELL, y = PADDING + r*CELL;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, CELL/2.5, 0, Math.PI*2);
+    if(type === 1) { // AI
+        const g = ctx.createRadialGradient(x, y, 2, x, y, CELL/2);
+        g.addColorStop(0, "#ff0000"); g.addColorStop(1, "#300");
+        // 移除红色棋子的荧光效果
+        ctx.fillStyle = g; ctx.fill();
+    } else { // User
+        ctx.fillStyle = "#eee"; ctx.fill();
+    }
+    ctx.restore();
+}
+
+function printLog(msg, isAi = false) {
+    const line = document.createElement('div');
+    line.className = 'log-line' + (isAi ? ' ai-taunt' : '');
+    line.innerHTML = isAi ? `> AI: ${msg}` : `> ${msg}`;
+    consoleEl.appendChild(line);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+    if(consoleEl.children.length > 30) consoleEl.removeChild(consoleEl.firstChild);
+}
+
+// 精准坐标计算
+canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    mousePos.x = (e.clientX - rect.left) * scaleX;
+    mousePos.y = (e.clientY - rect.top) * scaleY;
+    
+    const c = Math.round((mousePos.x - PADDING) / CELL);
+    const r = Math.round((mousePos.y - PADDING) / CELL);
+    
+    if(r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
+        const dx = mousePos.x - (PADDING + c*CELL);
+        const dy = mousePos.y - (PADDING + r*CELL);
+        if(Math.sqrt(dx*dx + dy*dy) < CELL * 0.45) {
+            mousePos.r = r; mousePos.c = c;
+        } else { mousePos.r = -1; }
+    } else { mousePos.r = -1; }
+    draw();
+};
+
+canvas.onclick = () => {
+    if(isGameOver || mousePos.r === -1 || board[mousePos.r][mousePos.c] !== 0) return;
+    executeAction(mousePos.r, mousePos.c, 2);
+};
+
+async function executeAction(r, c, role) {
+    // 新增：记录棋步到历史（悔棋用）
+    moveHistory.push({r, c, role});
+    board[r][c] = role;
+    lastMove = {r, c};
+    body.classList.add('shockwave');
+    setTimeout(() => body.classList.remove('shockwave'), 200);
+    draw();
+
+    if(checkWin(r, c, role)) {
+        gameOver(role === 2);
+        return;
+    }
+
+    if(role === 2) {
+        if(doubleMoveCount > 0) {
+            doubleMoveCount--;
+            printLog("镜像特权：连落二子中...");
+        } else {
+            await aiStep();
+        }
+    }
+}
+
+// 新增：悔棋功能函数
+function undoMove() {
+    // 游戏结束、无棋步可悔时不能悔棋
+    if(isGameOver || moveHistory.length === 0) {
+        printLog("错误：无可用的时光回溯节点！");
+        return;
+    }
+    
+    // 先撤销玩家的最后一步
+    const last = moveHistory.pop();
+    board[last.r][last.c] = 0;
+    printLog(`时光回溯：撤销 [${last.r}, ${last.c}] 位置的${last.role === 1 ? 'AI' : '玩家'}棋子`);
+    
+    // 如果最后一步是AI的，只撤销AI；如果是玩家的，还要检查是否有AI的下一步需要撤销
+    if(last.role === 2 && moveHistory.length > 0 && moveHistory[moveHistory.length-1].role === 1) {
+        const aiLast = moveHistory.pop();
+        board[aiLast.r][aiLast.c] = 0;
+        printLog(`时光回溯：同步撤销AI在 [${aiLast.r}, ${aiLast.c}] 的棋子`);
+    }
+    
+    // 更新最后一步标记
+    lastMove = moveHistory.length > 0 ? {r: moveHistory[moveHistory.length-1].r, c: moveHistory[moveHistory.length-1].c} : null;
+    // 重置游戏状态（取消结束状态）
+    isGameOver = false;
+    draw();
+    printLog("时光回溯完成：棋盘已恢复至上一状态");
+}
+
+async function aiStep() {
+    printLog("正在遍历最短处决路径...", false);
+    await new Promise(res => setTimeout(res, 500));
+    
+    const m = getBestMove();
+    printLog(TAUNTS[Math.floor(Math.random()*TAUNTS.length)], true);
+    executeAction(m.r, m.c, 1);
+}
+
+function getBestMove() {
+    let best = -Infinity, moves = [];
+    for(let r=0; r<SIZE; r++) {
+        for(let c=0; c<SIZE; c++) {
+            if(board[r][c] === 0) {
+                let s = evaluate(r, c);
+                if(s > best) { best = s; moves = [{r,c}]; }
+                else if(s === best) moves.push({r,c});
+            }
+        }
+    }
+    return moves[Math.floor(Math.random()*moves.length)];
+}
+
+function evaluate(r, c) {
+    let s = 0;
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    dirs.forEach(d => {
+        s += checkLine(r, c, d[0], d[1], 1) * 2.2; // AI高攻权重
+        s += checkLine(r, c, d[0], d[1], 2);
+    });
+    return s;
+}
+
+function checkLine(r, c, dr, dc, role) {
+    let cnt = 0, sides = 0;
+    for(let i=1; i<5; i++) {
+        let nr=r+dr*i, nc=c+dc*i;
+        if(board[nr]?.[nc] === role) cnt++; else { if(board[nr]?.[nc] === 0) sides++; break; }
+    }
+    for(let i=1; i<5; i++) {
+        let nr=r-dr*i, nc=c-dc*i;
+        if(board[nr]?.[nc] === role) cnt++; else { if(board[nr]?.[nc] === 0) sides++; break; }
+    }
+    if(cnt >= 4) return 1000000;
+    if(cnt === 3 && sides === 2) return 50000;
+    return cnt * 100;
+}
+
+function checkWin(r, c, role) {
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    return dirs.some(d => {
+        let n = 1;
+        for(let i=1; i<5; i++) if(board[r+d[0]*i]?.[c+d[1]*i] === role) n++; else break;
+        for(let i=1; i<5; i++) if(board[r-d[0]*i]?.[c-d[1]*i] === role) n++; else break;
+        return n >= 5;
+    });
+}
+
+function gameOver(userWin) {
+    isGameOver = true;
+    document.getElementById('overlay').style.display = 'flex';
+    if(userWin) {
+        document.getElementById('res-title').innerText = "FAULT";
+        document.getElementById('final-msg').innerText = "系统致命异常：算力模型已被逻辑悖论摧毁。";
+    } else {
+        document.getElementById('final-msg').innerText = "计算结果一致：你被永久抹除。";
+    }
+}
+
+function useSkill() {
+    if(currentSkill === 1) { // 湮灭
+        let aiP = [];
+        board.forEach((row, r) => row.forEach((v, c) => v===1 && aiP.push({r,c})));
+        for(let i=0; i<3 && aiP.length; i++) {
+            let p = aiP.splice(Math.floor(Math.random()*aiP.length), 1)[0];
+            board[p.r][p.c] = 0;
+            // 新增：湮灭技能也要同步更新悔棋历史
+            moveHistory = moveHistory.filter(m => !(m.r === p.r && m.c === p.c && m.role === 1));
+        }
+        printLog("湮灭：AI 三枚核心已强制离线。");
+    } else {
+        doubleMoveCount = 1;
+        printLog("镜像：获得额外行动权。");
+    }
+    skillBtn.disabled = true;
+    draw();
+}
+
+function boot(mode) {
+    board = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
+    isGameOver = false; lastMove = null; doubleMoveCount = 0;
+    // 新增：重置游戏时清空悔棋历史
+    moveHistory = [];
+    document.getElementById('overlay').style.display = 'none';
+    consoleEl.innerHTML = "";
+    currentSkill = Math.random() > 0.5 ? 1 : 2;
+    skillBtn.innerText = currentSkill === 1 ? "湮灭协议 (清除)" : "镜像协议 (连下)";
+    skillBtn.disabled = false;
+    if(mode === 1) { 
+        board[7][7] = 1; 
+        lastMove = {r:7, c:7};
+        // 新增：初始化的AI第一步也要记录到悔棋历史
+        moveHistory.push({r:7, c:7, role:1});
+    }
+    draw();
+    printLog("OMNIPOTENCE 内核已启动。");
+}
+
+boot(1);
+</script>
+</body>
+</html>
