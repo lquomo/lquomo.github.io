@@ -1,158 +1,291 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMCAxMCI+PGNpcmNsZSBjeD0iNSIgY3k9IjUiIHI9IjUiIGZpbGw9ImdvbGQiLz48L3N2Zz4=" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <title>提取专家 Ultra</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>拼合的 - 优化版</title>
+    <script src="./fabric.min.js"></script>
+    <script src="./Sortable.min.js"></script>
     <style>
-        :root { --accent: #007aff; --bg: #f2f2f7; --card: #ffffff; --danger: #ff3b30; --success: #34c759; }
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); height: 100dvh; overflow: hidden; padding-top: env(safe-area-inset-top); }
-        .app { display: flex; flex-direction: column; height: 100%; max-width: 600px; margin: 0 auto; }
-        header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-        header h1 { font-size: 26px; font-weight: 800; }
-        .reset { color: var(--danger); font-size: 14px; font-weight: 500; cursor: pointer; }
-        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 10px 16px; }
-        .config { display: flex; gap: 10px; margin-bottom: 15px; }
-        .box { background: var(--card); padding: 10px; border-radius: 12px; flex: 1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .box label { font-size: 10px; color: #8e8e93; display: block; margin-bottom: 2px; }
-        .box input { width: 100%; border: none; font-size: 15px; font-weight: 600; color: var(--accent); outline: none; background: transparent; }
-        .stats { display: flex; gap: 8px; margin-bottom: 15px; }
-        .pill { background: var(--card); padding: 6px 12px; border-radius: 20px; font-size: 12px; color: #8e8e93; }
-        .pill b { color: #000; }
-        .container { flex: 1; background: var(--card); border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .view { display: none; height: 100%; flex-direction: column; }
-        .view.active { display: flex; }
-        textarea { flex: 1; border: none; padding: 20px; font-size: 17px; resize: none; outline: none; line-height: 1.5; }
-        .list { flex: 1; overflow-y: auto; padding: 15px; -webkit-overflow-scrolling: touch; }
-        .row { padding: 12px; background: #f9f9fb; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .row.dup { background: #fff9f0; border: 1px solid #ffe0b2; }
-        .tray { position: absolute; bottom: 20px; left: 15px; right: 15px; background: rgba(255,255,255,0.9); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); padding: 10px; border-radius: 15px; display: flex; gap: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        .btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-p { background: var(--accent); color: #fff; }
-        .btn-s { background: #e5e5ea; color: #000; }
-        .btn-ok { background: var(--success); color: #fff; }
-        .btn:active { transform: scale(0.96); opacity: 0.8; }
-        .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(0,0,0,0.8); color:#fff; padding:10px 20px; border-radius:20px; display:none; z-index:999; }
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --sidebar-bg: #111827;
+            --card-bg: #1f2937;
+            --input-bg: #030712;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --radius: 12px;
+            --font-family: "SF Pro SC","SF Pro Text","SF Pro Icons","PingFang SC","Microsoft YaHei","微软雅黑",Verdana,Arial,sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            margin: 0; display: flex; height: 100vh;
+            background-color: #e5e7eb;
+            background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+            background-size: 24px 24px;
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        /* 优化：侧边栏增加最小宽度限制，防止挤压 */
+        .sidebar {
+            width: 25vw;
+            min-width: 320px;
+            max-width: 400px;
+            background: var(--sidebar-bg);
+            display: flex; flex-direction: column;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.2); z-index: 20;
+            border-right: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .sidebar-header { padding: 30px 24px; flex-shrink: 0; }
+        .sidebar-header h2 { margin: 0; font-size: 1.5rem; font-weight: 800; color: #fff; }
+
+        .sidebar-content { padding: 0 24px 24px 24px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+
+        .tab-group { display: flex; background: var(--input-bg); padding: 5px; border-radius: var(--radius); flex-shrink: 0; }
+        .tab { flex: 1; text-align: center; padding: 10px; font-size: 13px; cursor: pointer; border-radius: 8px; color: var(--text-muted); transition: 0.3s; }
+        .tab.active { background: var(--primary); color: white; }
+
+        #imageList { list-style: none; padding: 0; margin: 0; }
+        .img-card {
+            background: var(--card-bg); border-radius: var(--radius);
+            padding: 12px; display: flex; align-items: center; gap: 12px;
+            margin-bottom: 12px; cursor: grab; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .img-card img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; }
+
+        .input-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        input[type="text"] {
+            background: var(--input-bg); border: 1px solid #374151;
+            padding: 14px; border-radius: var(--radius); color: white; width: 100%; box-sizing: border-box;
+        }
+
+        .btn { padding: 14px 20px; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 700; width: 100%; transition: 0.2s; }
+        .btn-upload { background: rgba(255,255,255,0.05); color: white; border: 1px dashed rgba(255,255,255,0.2); }
+        .btn-save { background: var(--primary); color: white; margin-top: 10px; margin-bottom: 10px; flex-shrink: 0; }
+        .mini-btn { background: #374151; color: white; padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; }
+
+        /* 优化：工作区背景 */
+        .main-workspace { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; position: relative; }
+        .canvas-container-outer { transform-origin: center center; box-shadow: 0 30px 60px rgba(0,0,0,0.3); background: white; transition: transform 0.2s ease-out; }
+
+        .toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: #ef4444; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,0.2); font-weight: 600; animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 <body>
-    <div id="toast" class="toast">已复制</div>
-    <div class="app">
-        <header>
-            <h1>提取专家</h1>
-            <div class="reset" onclick="doReset()">重置全部</div>
-        </header>
-        <main>
-            <div class="config">
-                <div class="box"><label>目标位数</label><input type="number" id="tLen" value="19"></div>
-                <div class="box"><label>导出文件名</label><input type="text" id="fName" value="提取结果"></div>
-            </div>
-            <div class="stats">
-                <div class="pill">唯一数: <b id="sUni">0</b></div>
-                <div class="pill" onclick="copyDups()" style="cursor:pointer">重复项: <b id="sDup">0</b> (点此复制)</div>
-            </div>
-            <div class="container">
-                <div id="v1" class="view active">
-                    <textarea id="tIn" placeholder="请在此粘贴包含数字的文本..."></textarea>
-                    <div class="tray">
-                        <button class="btn btn-p" onclick="doExtract()">解析并追加</button>
-                        <button class="btn btn-s" id="vBtn" style="display:none" onclick="go(2)">查看库</button>
-                    </div>
-                </div>
-                <div id="v2" class="view">
-                    <div class="list" id="tList"></div>
-                    <div class="tray">
-                        <button class="btn btn-s" onclick="go(1)">返回追加</button>
-                        <button class="btn btn-ok" onclick="doExport()">导出 Excel</button>
-                    </div>
-                </div>
-            </div>
-        </main>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<div class="sidebar">
+    <div class="sidebar-header"><h2>拼合图工具</h2></div>
+    <div class="sidebar-content">
+        <div class="tab-group">
+            <div id="tab-landscape" class="tab active" onclick="switchMode('landscape')">横向模式</div>
+            <div id="tab-portrait" class="tab" onclick="switchMode('portrait')">纵向模式</div>
+        </div>
+        <button class="btn btn-upload" onclick="document.getElementById('f').click()">+ 上传图像</button>
+        <input type="file" id="f" multiple accept="image/*" style="display: none;">
+        <ul id="imageList"></ul>
+        <div class="input-group"><label>大标题</label><input type="text" id="t1" placeholder="必填内容" oninput="updateTexts()"></div>
+        <div class="input-group"><label>二标题</label><input type="text" id="t2" placeholder="必填内容" oninput="updateTexts()"></div>
+        <button class="btn btn-save" onclick="save()">导出图片</button>
     </div>
+</div>
+
+<div class="main-workspace">
+    <div id="canvasWrapper" class="canvas-container-outer"><canvas id="c"></canvas></div>
+</div>
 
 <script>
-    let db = []; // 核心数据存储
+    let canvas, imgs = [], mode = 'landscape', isRendering = false;
+    const GAP = 2;
+    const DEFAULT_FONT = '"Microsoft YaHei", "微软雅黑"';
 
-    function doExtract() {
-        const val = document.getElementById('tIn').value.trim();
-        const len = parseInt(document.getElementById('tLen').value);
-        if (!val && db.length === 0) return;
+    window.onload = () => { initCanvas(); initSortable(); };
+    window.onresize = () => adjustZoom();
 
-        const raw = val.match(/\d+/g) || [];
-        const clean = raw.filter(n => n.length === len);
+    function showToast(msg) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerText = msg;
+        container.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+    }
 
-        // 核心追加逻辑
-        clean.forEach(num => {
-            let item = db.find(d => d.val === num);
-            if (item) { item.count++; } else { db.push({ val: num, count: 1 }); }
+    function initSortable() {
+        Sortable.create(document.getElementById('imageList'), {
+            animation: 150,
+            onEnd: function () {
+                const ids = Array.from(document.querySelectorAll('.img-card')).map(li => li.getAttribute('data-id'));
+                imgs.sort((a, b) => ids.indexOf(a.id.toString()) - ids.indexOf(b.id.toString()));
+                updateUI();
+            }
+        });
+    }
+
+    function initCanvas() {
+        const w = mode === 'landscape' ? 1024 : 768, h = mode === 'landscape' ? 768 : 1024;
+        if (canvas) canvas.dispose();
+        canvas = new fabric.Canvas('c', { width: w, height: h, backgroundColor: '#fff', preserveObjectStacking: true });
+        adjustZoom();
+        render(); // 只有初始化和图片变动才调 render
+    }
+
+    function adjustZoom() {
+        const wrapper = document.querySelector('.main-workspace');
+        if(!wrapper || !canvas) return;
+        const scale = Math.min((wrapper.offsetWidth - 40) / canvas.width, (wrapper.offsetHeight - 40) / canvas.height, 1);
+        document.getElementById('canvasWrapper').style.transform = `scale(${scale})`;
+    }
+
+    function switchMode(m) {
+        mode = m;
+        document.getElementById('tab-landscape').className = m === 'landscape' ? 'tab active' : 'tab';
+        document.getElementById('tab-portrait').className = m === 'portrait' ? 'tab active' : 'tab';
+        initCanvas();
+    }
+
+    document.getElementById('f').onchange = (e) => {
+        const files = Array.from(e.target.files);
+        let loaded = 0;
+        files.forEach(file => {
+            const r = new FileReader();
+            r.onload = (f) => {
+                imgs.push({ id: 'id_' + Date.now() + Math.random(), src: f.target.result, angle: 0 });
+                loaded++;
+                if(loaded === files.length) updateUI();
+            };
+            r.readAsDataURL(file);
+        });
+        e.target.value = '';
+    };
+
+    function updateUI() {
+        const list = document.getElementById('imageList');
+        list.innerHTML = '';
+        imgs.forEach((img, i) => {
+            const li = document.createElement('li');
+            li.className = 'img-card';
+            li.setAttribute('data-id', img.id);
+            li.innerHTML = `<img src="${img.src}"><div style="flex:1;font-size:12px;color:var(--text-muted)">图层 ${i+1}</div>
+                <button class="mini-btn" onclick="rotateById('${img.id}')">旋</button>
+                <button class="mini-btn" onclick="delById('${img.id}')" style="background:var(--danger)">×</button>`;
+            list.appendChild(li);
+        });
+        render();
+    }
+
+    function rotateById(id) { const t = imgs.find(x => x.id === id); if(t){t.angle=(t.angle+90)%360; render();} }
+    function delById(id) { imgs = imgs.filter(x => x.id !== id); updateUI(); }
+
+    function renderImage(data, region) {
+        return new Promise(res => {
+            fabric.Image.fromURL(data.src, img => {
+                img.set({ angle: data.angle });
+                const isRot = data.angle % 180 !== 0;
+                const iW = isRot ? img.height : img.width, iH = isRot ? img.width : img.height;
+                const sc = Math.max(region.w/iW, region.h/iH);
+                img.set({ 
+                    left: region.x + region.w/2, top: region.y + region.h/2, 
+                    originX: 'center', originY: 'center', scaleX: sc, scaleY: sc,
+                    selectable: true,
+                    clipPath: new fabric.Rect({ left: region.x, top: region.y, width: region.w, height: region.h, absolutePositioned: true })
+                });
+                canvas.add(img); 
+                img.sendToBack(); 
+                res();
+            });
+        });
+    }
+
+    // 核心修改：将文字更新独立出来，避免重绘整块画布导致的闪烁
+    async function updateTexts() {
+        if (!canvas) return;
+        const t1Val = document.getElementById('t1').value || "输入主标题";
+        const t2Val = document.getElementById('t2').value || "输入副标题";
+        
+        let mainT = canvas.getObjects().find(obj => obj.id === 'mainTitle');
+        let subT = canvas.getObjects().find(obj => obj.id === 'subTitle');
+
+        if (mainT && subT) {
+            mainT.set({ text: t1Val });
+            subT.set({ text: t2Val });
+            canvas.renderAll();
+        } else {
+            // 如果文字对象不存在（比如刚初始化），则执行完整渲染
+            render();
+        }
+    }
+
+    async function render() {
+        if (!canvas || isRendering) return;
+        isRendering = true;
+        
+        canvas.clear();
+        canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+
+        const W = canvas.width, H = canvas.height, g = GAP/2;
+        const regions = [
+            { x: 0, y: 0, w: W/2 - g, h: H/2 - g },
+            { x: W/2 + g, y: 0, w: W/2 - g, h: H/2 - g },
+            { x: W/2 + g, y: H/2 + g, w: W/2 - g, h: H/2 - g },
+            { x: 0, y: H/2 + g, w: W/2 - g, h: H/2 - g }
+        ];
+
+        for (let i = 0; i < Math.min(imgs.length, 3); i++) {
+            await renderImage(imgs[i], regions[i]);
+        }
+
+        const rT = regions[3];
+        const padding = 30;
+        const maxW = rT.w - padding * 2;
+
+        const mainT = new fabric.Textbox(document.getElementById('t1').value || "输入主标题", {
+            id: 'mainTitle', // 绑定ID以便局部更新
+            left: rT.x + rT.w/2, top: rT.y + rT.h/2 - 20,
+            width: maxW, fontSize: 50, fontWeight: 800, fill: '#1e293b', 
+            textAlign: 'center', originX: 'center', originY: 'bottom', selectable: false,
+            fontFamily: DEFAULT_FONT
+        });
+        
+        const subT = new fabric.Textbox(document.getElementById('t2').value || "输入副标题", {
+            id: 'subTitle', // 绑定ID以便局部更新
+            left: rT.x + rT.w/2, top: rT.y + rT.h/2 + 10,
+            width: maxW, fontSize: 40, fill: '#1e293b', 
+            textAlign: 'center', originX: 'center', originY: 'top', selectable: false,
+            fontFamily: DEFAULT_FONT
         });
 
-        document.getElementById('tIn').value = "";
-        render();
-        go(2);
+        const now = new Date();
+        const timeStr = `更新于: ${now.toLocaleString()}`;
+        const timeT = new fabric.Text(timeStr, {
+            left: rT.x + rT.w/2, top: rT.y + rT.h - 15,
+            fontSize: 20, fill: '#94a3b8', originX: 'center', originY: 'bottom', selectable: false,
+            fontFamily: DEFAULT_FONT
+        });
+
+        canvas.add(mainT, subT, timeT);
+        canvas.renderAll();
+        isRendering = false;
     }
 
-    function render() {
-        const listEl = document.getElementById('tList');
-        const dups = db.filter(d => d.count > 1);
-        document.getElementById('sUni').textContent = db.length;
-        document.getElementById('sDup').textContent = dups.length;
-        document.getElementById('vBtn').style.display = db.length > 0 ? 'block' : 'none';
-
-        if (db.length === 0) {
-            listEl.innerHTML = '<p style="text-align:center;margin-top:50px;color:#8e8e93">库中暂无数据</p>';
-            return;
-        }
-
-        listEl.innerHTML = db.map(i => `
-            <div class="row ${i.count > 1 ? 'dup' : ''}" onclick="copySingle('${i.val}', ${i.count})">
-                <span style="font-family:monospace;font-weight:600">${i.val}</span>
-                <span style="font-size:11px;color:#8e8e93">${i.count > 1 ? i.count + '次重复' : '唯一'}</span>
-            </div>
-        `).join('');
+    function save() {
+        const t1 = document.getElementById('t1').value.trim();
+        const t2 = document.getElementById('t2').value.trim();
+        if (!t1 || !t2) { showToast("⚠️ 两个标题为必填项"); return; }
+        const url = canvas.toDataURL({ format: 'png', multiplier: 2 });
+        const link = document.createElement('a');
+        link.download = `${t1}-${t2}.png`;
+        link.href = url;
+        link.click();
     }
-
-    function doExport() {
-        if (db.length === 0) return;
-        const fn = document.getElementById('fName').value || "export";
-        const aoa = db.map(d => [d.val]);
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        
-        // 关键：防止科学计数法，强制 A 列为文本格式
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for (let R = 0; R <= range.e.r; ++R) {
-            const cell = ws[XLSX.utils.encode_cell({r: R, c: 0})];
-            if (cell) { cell.t = 's'; cell.z = '@'; }
-        }
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Data");
-        XLSX.writeFile(wb, `${fn}.xlsx`);
-    }
-
-    function go(n) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById('v' + n).classList.add('active');
-    }
-
-    function copySingle(v, c) {
-        const s = c > 1 ? `${v} 发了${c}次` : v;
-        navigator.clipboard.writeText(s).then(() => showT());
-    }
-
-    function copyDups() {
-        const s = db.filter(d => d.count > 1).map(d => `${d.val} 发了${d.count}次`).join('\n');
-        if (s) navigator.clipboard.writeText(s).then(() => alert('已复制所有重复项清单'));
-    }
-
-    function doReset() { if (confirm("确定重置吗？")) { db = []; render(); go(1); } }
-    function showT() { const t = document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none', 1000); }
 </script>
 </body>
 </html>
