@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 禁止缩放 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>SN商品ID提取工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+
+        .page {
+            max-width: 540px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+            padding: 24px;
+            display: none;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .page.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        h1::after {
+            content: "";
+            display: block;
+            width: 40px;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            margin: 8px auto 0;
+            border-radius: 3px;
+        }
+
+        /* 提取页样式 */
+        #extractPage .form-group {
+            margin-bottom: 16px;
+        }
+
+        #extractPage label {
+            display: block;
+            color: #4a5568;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        #extractPage textarea {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            color: #2d3748;
+            background: #f8fafc;
+            transition: border 0.3s ease;
+            min-height: 200px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        #extractPage textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .extract-btn {
+            width: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .extract-btn:active {
+            transform: scale(0.98);
+        }
+
+        .extract-btn.loading {
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        /* 复制页样式 */
+        #copyPage .current-ids {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid #e2e8f0;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        #copyPage .current-ids-text {
+            font-size: 16px;
+            color: #2d3748;
+        }
+
+        #copyPage .count-tip {
+            text-align: center;
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .copy-btn-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .copy-btn {
+            flex: 1;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .copy-all-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .copy-batch-btn {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .copy-btn:active {
+            transform: scale(0.98);
+        }
+
+        .copy-btn.disabled {
+            opacity: 0.7;
+            pointer-events: none;
+            background: #a0aec0 !important;
+        }
+
+        .big-copy-btn {
+            width: 100%;
+            height: 120px;
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .big-copy-btn:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .big-copy-btn.disabled {
+            opacity: 0.7;
+            pointer-events: none;
+            background: #a0aec0 !important;
+        }
+
+        .back-btn {
+            width: 100%;
+            background: #f8fafc;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .back-btn:active {
+            background: #e2e8f0;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(45, 55, 72, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            display: none;
+            z-index: 9999;
+            min-width: 200px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* 适配小屏 */
+        @media (max-width: 375px) {
+            .big-copy-btn {
+                height: 100px;
+                font-size: 20px;
+            }
+            #copyPage .current-ids {
+                padding: 16px;
+            }
+            .page {
+                padding: 18px;
+            }
+            .copy-btn-group {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 第一步：提取页 -->
+    <div class="page active" id="extractPage">
+        <h1>苏宁商品ID提取</h1>
+        
+        <!-- 商品链接输入 -->
+        <div class="form-group">
+            <label for="urlInput">苏宁商品链接（每行一个）</label>
+            <textarea id="urlInput" placeholder="请粘贴苏宁商品链接，每行一个..."></textarea>
+        </div>
+        
+        <!-- 提取按钮 -->
+        <button class="extract-btn" id="extractBtn">提取ID → 进入复制页</button>
+    </div>
+
+    <!-- 第二步：复制页 -->
+    <div class="page" id="copyPage">
+        <h1>复制商品ID</h1>
+        <div class="current-ids" id="currentIds">
+            <span class="current-ids-text" id="currentIdsText">暂无ID，请先提取</span>
+        </div>
+        <div class="count-tip" id="countTip">剩余ID：0</div>
+        
+        <!-- 复制按钮组 -->
+        <div class="copy-btn-group">
+            <button class="copy-btn copy-all-btn disabled" id="copyAllBtn">复制全部ID</button>
+            <button class="copy-btn copy-batch-btn disabled" id="copyBatchBtn">复制5个ID</button>
+        </div>
+        
+        <button class="big-copy-btn disabled" id="bigCopyBtn">点击复制当前ID</button>
+        <button class="back-btn" id="backBtn">← 返回重新提取</button>
+    </div>
+
+    <!-- 提示框 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // DOM元素
+        const extractPage = document.getElementById('extractPage');
+        const copyPage = document.getElementById('copyPage');
+        const urlInput = document.getElementById('urlInput');
+        const extractBtn = document.getElementById('extractBtn');
+        const copyAllBtn = document.getElementById('copyAllBtn');
+        const copyBatchBtn = document.getElementById('copyBatchBtn');
+        const bigCopyBtn = document.getElementById('bigCopyBtn');
+        const backBtn = document.getElementById('backBtn');
+        const currentIdsText = document.getElementById('currentIdsText');
+        const countTip = document.getElementById('countTip');
+        const toast = document.getElementById('toast');
+
+        // 全局变量
+        let idArray = [];
+        let batchStartIndex = 0; // 批量复制起始位置
+        const btnColors = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+        ];
+        let currentColorIndex = 0;
+
+        // 提示框函数
+        function showToast(msg, duration = 1500) {
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', duration);
+        }
+
+        // 复制到剪贴板
+        function copyToClipboard(text) {
+            if (!text || text.trim() === '') {
+                showToast('无内容可复制');
+                return false;
+            }
+            
+            try {
+                // 优先使用Clipboard API
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast('复制成功！');
+                        return true;
+                    }).catch(() => {
+                        // 降级方案
+                        fallbackCopy(text);
+                    });
+                } else {
+                    fallbackCopy(text);
+                }
+                return true;
+            } catch (err) {
+                showToast('复制失败，请手动复制');
+                console.error('复制错误：', err);
+                return false;
+            }
+        }
+
+        // 复制降级方案
+        function fallbackCopy(text) {
+            const tempTextarea = document.createElement('textarea');
+            tempTextarea.value = text;
+            document.body.appendChild(tempTextarea);
+            tempTextarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextarea);
+            showToast('复制成功！');
+        }
+
+        // 更新复制页UI
+        function updateCopyUI() {
+            const count = idArray.length;
+            countTip.textContent = `剩余ID：${count}`;
+            
+            if (count > 0) {
+                // 显示第一个ID
+                currentIdsText.textContent = idArray[0];
+                // 启用按钮
+                bigCopyBtn.classList.remove('disabled');
+                copyAllBtn.classList.remove('disabled');
+                copyBatchBtn.classList.remove('disabled');
+            } else {
+                currentIdsText.textContent = '所有ID已复制完成';
+                // 禁用按钮
+                bigCopyBtn.classList.add('disabled');
+                copyAllBtn.classList.add('disabled');
+                copyBatchBtn.classList.add('disabled');
+            }
+        }
+
+        // 切换按钮颜色
+        function changeBtnColor() {
+            currentColorIndex = (currentColorIndex + 1) % btnColors.length;
+            bigCopyBtn.style.background = btnColors[currentColorIndex];
+        }
+
+        // 切换页面
+        function switchPage(fromPage, toPage) {
+            fromPage.classList.remove('active');
+            toPage.classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // 提取商品ID
+        function extractIds(urlText) {
+            if (!urlText || urlText.trim() === '') {
+                showToast('请输入苏宁商品链接');
+                return null;
+            }
+
+            const urlLines = urlText.trim().split('\n');
+            const ids = [];
+            
+            // 正则匹配：提取.html前一个斜杠后的数字
+            const regex = /\/(\d+)\.html$/;
+            
+            urlLines.forEach(line => {
+                if (line.trim()) {
+                    const match = line.match(regex);
+                    if (match && match[1]) {
+                        ids.push(match[1]);
+                    }
+                }
+            });
+
+            if (ids.length === 0) {
+                showToast('未提取到任何商品ID，请检查链接格式');
+                return null;
+            }
+
+            return ids;
+        }
+
+        // 提取按钮点击事件
+        extractBtn.addEventListener('click', () => {
+            // 禁用按钮，显示加载状态
+            extractBtn.classList.add('loading');
+            extractBtn.innerText = '提取中...';
+
+            // 获取输入的链接
+            const urlText = urlInput.value;
+            
+            // 提取ID
+            const ids = extractIds(urlText);
+            
+            // 恢复按钮状态
+            extractBtn.classList.remove('loading');
+            extractBtn.innerText = '提取ID → 进入复制页';
+
+            if (!ids) return;
+
+            // 存储提取的ID，重置批量复制位置和颜色
+            idArray = ids;
+            batchStartIndex = 0;
+            currentColorIndex = 0;
+            bigCopyBtn.style.background = btnColors[0];
+
+            // 更新UI并切换页面
+            updateCopyUI();
+            switchPage(extractPage, copyPage);
+            showToast(`成功提取 ${ids.length} 个商品ID`);
+        });
+
+        // 复制当前ID按钮事件
+        bigCopyBtn.addEventListener('click', () => {
+            if (idArray.length === 0) {
+                showToast('已无剩余ID');
+                return;
+            }
+
+            // 复制第一个ID
+            const currentId = idArray.shift().trim();
+            if (copyToClipboard(currentId)) {
+                // 切换颜色+更新UI
+                changeBtnColor();
+                updateCopyUI();
+            }
+        });
+
+        // 复制全部ID按钮事件
+        copyAllBtn.addEventListener('click', () => {
+            if (idArray.length === 0) {
+                showToast('已无剩余ID');
+                return;
+            }
+
+            const allIds = idArray.join('\n');
+            if (copyToClipboard(allIds)) {
+                // 清空ID数组
+                idArray = [];
+                updateCopyUI();
+                showToast(`已复制全部${allIds.split('\n').length}个ID`);
+            }
+        });
+
+        // 批量复制5个ID按钮事件
+        copyBatchBtn.addEventListener('click', () => {
+            if (idArray.length === 0) {
+                showToast('已无剩余ID');
+                return;
+            }
+
+            // 截取当前批次的5个ID
+            const batchIds = idArray.slice(batchStartIndex, batchStartIndex + 5);
+            
+            if (batchIds.length === 0) {
+                showToast('已复制完所有ID，将重新从第一个开始复制！');
+                batchStartIndex = 0;
+                // 复制前5个
+                const firstBatch = idArray.slice(0, 5);
+                if (copyToClipboard(firstBatch.join('\n'))) {
+                    // 移除已复制的ID
+                    idArray = idArray.slice(5);
+                    updateCopyUI();
+                    showToast(`已复制第1-${Math.min(5, idArray.length + 5)}个ID`);
+                }
+                return;
+            }
+
+            // 复制当前批次的ID
+            if (copyToClipboard(batchIds.join('\n'))) {
+                // 更新下一次的起始位置
+                batchStartIndex += 5;
+                
+                // 移除已复制的ID
+                idArray = idArray.slice(batchStartIndex);
+                batchStartIndex = 0; // 重置批量起始位置
+                
+                // 提示当前复制的范围
+                const copiedCount = batchIds.length;
+                const remainingCount = idArray.length;
+                updateCopyUI();
+                showToast(`已复制${copiedCount}个ID，剩余${remainingCount}个`);
+            }
+        });
+
+        // 返回按钮事件
+        backBtn.addEventListener('click', () => {
+            switchPage(copyPage, extractPage);
+        });
+
+        // 页面加载完成后自动提取示例链接的ID（可选）
+        window.addEventListener('load', () => {
+            // 取消自动提取，让用户手动操作
+            // extractBtn.click();
+        });
+    </script>
+</body>
+</html>
