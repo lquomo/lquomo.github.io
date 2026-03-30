@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>订单自动解析工具</title>
+<style>
+*{box-sizing:border-box;font-family:微软雅黑,system-ui}
+body{margin:20px;background:#f4f6f8}
+.container{max-width:1200px;margin:0 auto}
+.box{background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:20px}
+textarea{width:100%;height:260px;padding:12px;font-size:14px;border:1px solid #ddd;border-radius:6px}
+button{padding:10px 24px;background:#2f85ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:15px;margin-top:10px}
+button:hover{background:#2572e0}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th,td{border:1px solid #dee2e6;padding:10px;text-align:left}
+th{background:#e9f0ff}
+tr:nth-child(2n){background:#f8f9fa}
+.tag{color:#d32f2f;font-weight:bold}
+.summary{margin-top:15px;padding:12px;background:#e9f0ff;border-radius:6px;font-size:15px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="box">
+    <h3>粘贴客户订单文本</h3>
+    <textarea id="inputText" placeholder="将客户发来的所有订单内容粘贴到这里..."></textarea>
+    <button onclick="parse()">开始解析提取</button>
+  </div>
+
+  <div class="box">
+    <h3>解析结果</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>序号</th>
+          <th>类目</th>
+          <th>数量</th>
+          <th>重量</th>
+          <th>备注</th>
+          <th>操作要求</th>
+        </tr>
+      </thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+    <div id="summary" class="summary"></div>
+  </div>
+</div>
+
+<script>
+function parse(){
+  const raw = document.getElementById('inputText').value
+  const lines = raw.split(/\n+/)
+    .map(l => l.trim())
+    .filter(l => l.length > 3 && !/单子\d+/.test(l))
+  
+  const tbody = document.getElementById('resultBody')
+  const summary = document.getElementById('summary')
+  tbody.innerHTML = ''
+  summary.innerHTML = ''
+  
+  let index = 1
+  let totalItems = 0
+  let zhongtong = 0
+  let datong = 0
+  let xiangzi = 0
+
+  // 匹配标准格式：名称:数字桶/数字公斤
+  const reg1 = /^(.+?):(\d+)(桶|箱)\/.*?(\d+(?:\.\d+)?)公斤/
+  // 匹配箱+桶+重量：名称:5箱/6桶/3.5公斤
+  const reg2 = /^(.+?):(\d+)箱\/\d+桶\/(\d+(?:\.\d+)?)公斤/
+
+  lines.forEach(line => {
+    let category, quantity, weight, remark, tag = ''
+    let weightNum = 0
+    let qtyNum = 0
+    
+    // 匹配 箱/桶/重量 格式
+    if (reg2.test(line)) {
+      const m = line.match(reg2)
+      category = m[1].trim()
+      quantity = m[2] + '箱'
+      weight = m[3] + 'kg'
+      weightNum = parseFloat(m[3])
+      qtyNum = parseInt(m[2])
+      remark = line.replace(reg2, '').replace(/^[,，\s]+/, '').trim()
+    }
+    // 匹配常规格式
+    else if (reg1.test(line)) {
+      const m = line.match(reg1)
+      category = m[1].trim()
+      quantity = m[2] + m[3]
+      weight = m[4] + 'kg'
+      weightNum = parseFloat(m[4])
+      qtyNum = parseInt(m[2])
+      remark = line.replace(reg1, '').replace(/^[,，\s]+/, '').trim()
+    }
+    else return
+
+    // 自动判断：包含打印 或 数量是箱 → 需要打标
+    if (remark.includes('打印') || quantity.includes('箱')) {
+      tag = '<span class="tag">需要打标</span>'
+    }
+
+    // 统计分类
+    totalItems += qtyNum
+    if(weightNum < 10){
+      xiangzi += qtyNum
+    } else if(weightNum >=10 && weightNum <=20){
+      zhongtong += qtyNum
+    } else if(weightNum >=100 && weightNum <=200){
+      datong += qtyNum
+    }
+
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td>${index++}</td>
+      <td>${category}</td>
+      <td>${quantity}</td>
+      <td>${weight}</td>
+      <td>${remark}</td>
+      <td>${tag}</td>
+    `
+    tbody.appendChild(tr)
+  })
+
+  // 输出合计
+  summary.innerHTML = `
+    【合计】总件数：${totalItems} 件<br>
+    其中：中桶：${zhongtong} 桶，大桶：${datong} 桶，箱子：${xiangzi} 件
+  `
+}
+</script>
+</body>
+</html>
