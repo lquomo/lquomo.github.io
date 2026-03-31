@@ -1,134 +1,657 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>订单自动解析工具</title>
 <style>
-*{box-sizing:border-box;font-family:微软雅黑,system-ui}
-body{margin:20px;background:#f4f6f8}
-.container{max-width:1200px;margin:0 auto}
-.box{background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:20px}
-textarea{width:100%;height:260px;padding:12px;font-size:14px;border:1px solid #ddd;border-radius:6px}
-button{padding:10px 24px;background:#2f85ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:15px;margin-top:10px}
-button:hover{background:#2572e0}
-table{width:100%;border-collapse:collapse;margin-top:15px}
-th,td{border:1px solid #dee2e6;padding:10px;text-align:left}
-th{background:#e9f0ff}
-tr:nth-child(2n){background:#f8f9fa}
-.tag{color:#d32f2f;font-weight:bold}
-.summary{margin-top:15px;padding:12px;background:#e9f0ff;border-radius:6px;font-size:15px}
+/* 基础字体 - 系统自带+思源黑体，确保兼容性 */
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 400;
+  src: local('思源黑体'), local('Source Han Sans SC'), local('Noto Sans CJK SC');
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 600;
+  src: local('思源黑体 Bold'), local('Source Han Sans SC Bold'), local('Noto Sans CJK SC Bold');
+}
+
+:root {
+  --bg: #f0f2f8;
+  --surface: #ffffff;
+  --surface-2: #f8f9fc;
+  --border: #e2e6f0;
+  --primary: #4f6ef7;
+  --primary-light: #eef1fe;
+  --primary-dark: #3a56d4;
+  --accent: #f76f6f;
+  --success: #3ecf8e;
+  --text: #1a1d2e;
+  --text-2: #6b7280;
+  --text-3: #9ca3af;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+  --radius: 14px;
+  --radius-sm: 8px;
+  /* 新增：电脑端最大宽度 */
+  --max-width: 1200px;
+}
+
+* {box-sizing:border-box; margin:0; padding:0;}
+
+body {
+  font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 20px 14px;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(79,110,247,.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(247,111,111,.08) 0%, transparent 60%);
+  /* 新增：限制页面最大宽度，居中显示 */
+  max-width: var(--max-width);
+  margin: 0 auto;
+  position: relative; /* 新增：为提示框定位提供参考 */
+}
+
+/* 修复：补全动画闭合括号 */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { 
+  from { opacity: 0; transform: translateY(10px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
+
+/* Header */
+.header {
+  margin: 0 auto 24px; /* 调整间距更和谐 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, var(--primary), #7b8cff);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(79,110,247,.3);
+  flex-shrink: 0;
+}
+.header-title h1 {
+  font-size: 22px; /* 电脑端放大标题 */
+  font-weight: 700;
+  color: var(--text);
+}
+.header-title p {
+  font-size: 14px; /* 电脑端放大副标题 */
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 20px; /* 调整间距更和谐 */
+  margin-left: 8px;
+  margin-right: 8px;
+  transition: all 0.2s ease;
+}
+/* 卡片悬浮效果 */
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.08);
+  border-color: rgba(79, 110, 247, 0.15);
+}
+.card-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--surface-2);
+}
+.card-title {
+  font-size: 16px; /* 电脑端放大卡片标题 */
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+.card-body {
+  padding: 20px 20px; /* 调整内边距更和谐 */
+}
+
+/* 输入框 */
+.input-area {
+  width: 100%;
+  min-height: 420px;
+  max-height: 600px;
+  padding: 16px 18px; /* 电脑端加大内边距 */
+  font-size: 15px; /* 电脑端放大字体 */
+  font-family: inherit;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--surface); /* 修改为纯白背景更和谐 */
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  transition: border-color .2s, box-shadow .2s;
+  outline: none;
+}
+.input-area:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,110,247,.12);
+}
+
+/* 按钮 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  justify-content: center;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(79,110,247,.3);
+  max-width: 320px;
+  margin: 0 auto;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(79,110,247,.4);
+}
+.btn-primary:active { 
+  transform: scale(0.98) translateY(0); 
+}
+.btn-ghost {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1.5px solid var(--border);
+  padding: 8px 16px;
+  font-size: 13px;
+  width: auto;
+}
+.btn-ghost:hover {
+  background-color: var(--primary-light);
+  border-color: rgba(79, 110, 247, 0.2);
+  color: var(--primary);
+}
+.btn-back {
+  padding: 8px 14px;
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-back:hover {
+  background-color: var(--primary-light);
+  border-color: rgba(79, 110, 247, 0.2);
+  color: var(--primary);
+}
+
+/* 统计 */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px; /* 加大间距 */
+  margin-bottom: 24px; /* 调整间距更和谐 */
+  max-width: 800px; /* 限制统计区域宽度 */
+  margin-left: auto;
+  margin-right: auto;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px 12px; /* 加大内边距 */
+  text-align: center;
+  transition: all 0.2s ease;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.05);
+  border-color: rgba(79, 110, 247, 0.15);
+}
+.stat-label {
+  font-size: 12px; /* 放大标签字体 */
+  color: var(--text-2); /* 调整颜色更和谐 */
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stat-value {
+  font-size: 32px; /* 放大数值字体 */
+  font-weight: 700;
+  line-height: 1.2;
+}
+.stat-value.primary { color: var(--primary); }
+.stat-value.success { color: var(--success); }
+.stat-value.accent { color: var(--accent); }
+
+/* 表格 */
+.table-scroll { 
+  overflow-x: auto;
+  max-width: calc(var(--max-width) - 40px);
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px; /* 电脑端放大表格字体 */
+  min-width: 600px; /* 调整最小宽度 */
+  max-width: 100%;
+}
+thead th {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-weight: 600;
+  font-size: 12px; /* 放大表头字体 */
+  padding: 14px 16px; /* 加大表头内边距 */
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+/* 新增：需要打标的行文字红色 */
+tbody tr.need-tag {
+  color: #f76f6f;
+  background-color: rgba(247, 111, 111, 0.03);
+}
+tbody tr:hover { 
+  background: var(--primary-light);
+}
+td {
+  padding: 14px 16px; /* 加大单元格内边距 */
+  vertical-align: middle;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px; /* 加大空状态内边距 */
+  color: var(--text-3);
+}
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+.empty-state p {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* 摘要 */
+.summary-bar {
+  margin-top: 24px;
+  padding: 16px 20px; /* 加大内边距 */
+  background: var(--primary-light);
+  border-radius: var(--radius-sm);
+  font-size: 14px; /* 放大字体 */
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid rgba(79, 110, 247, 0.15);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 提示 - 修复错位问题 */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px); /* 调整初始位置 */
+  opacity: 0; /* 用opacity控制显示 */
+  background: rgba(30, 30, 30, 0.9); /* 半透明背景更和谐 */
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 更顺滑的动画 */
+  z-index: 9999; /* 提高层级避免被遮挡 */
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+.toast.show { 
+  transform: translateX(-50%) translateY(0); 
+  opacity: 1; /* 显示时opacity为1 */
+}
+
+/* 工具栏 */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 8px;
+}
+
+/* 响应式适配 - 手机端 */
+@media (max-width: 768px) {
+  :root {
+    --max-width: 100%;
+  }
+  .header-title h1 {
+    font-size: 19px;
+  }
+  .header-title p {
+    font-size: 12px;
+  }
+  .card-title {
+    font-size: 15px;
+  }
+  .input-area {
+    min-height: 380px;
+    max-height: 450px;
+    font-size: 14px;
+    padding: 14px 16px;
+  }
+  .btn-primary {
+    max-width: 100%;
+  }
+  .stats-row {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-width: 100%;
+  }
+  .stat-value {
+    font-size: 24px;
+  }
+  table {
+    font-size: 13.5px;
+    min-width: 500px;
+  }
+  th, td {
+    padding: 10px 12px;
+  }
+  /* 手机端提示框调整 */
+  .toast {
+    bottom: 20px;
+    padding: 10px 20px;
+    font-size: 13px;
+    max-width: calc(100% - 40px);
+    white-space: normal;
+    text-align: center;
+  }
+}
 </style>
 </head>
+
 <body>
-<div class="container">
-  <div class="box">
-    <h3>粘贴客户订单文本</h3>
-    <textarea id="inputText" placeholder="将客户发来的所有订单内容粘贴到这里..."></textarea>
-    <button onclick="parse()">开始解析提取</button>
+
+<!-- ================== 输入页面 ================== -->
+<div id="inputPage" class="page active">
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">📋</div>
+      <div class="header-title">
+        <h1>订单自动解析工具</h1>
+        <p>一键提取订单商品、数量、重量</p>
+      </div>
+    </div>
   </div>
 
-  <div class="box">
-    <h3>解析结果</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>序号</th>
-          <th>类目</th>
-          <th>数量</th>
-          <th>重量</th>
-          <th>备注</th>
-          <th>操作要求</th>
-        </tr>
-      </thead>
-      <tbody id="resultBody"></tbody>
-    </table>
-    <div id="summary" class="summary"></div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📝 粘贴订单文本</div>
+      <button class="btn btn-ghost" onclick="clearInput()">清空</button>
+    </div>
+    <div class="card-body">
+      <textarea class="input-area" id="inputText" placeholder="将客户发来的所有订单内容粘贴到这里…
+
+示例格式：
+鸡蛋:5桶/6.5公斤，打印
+番茄:3箱/5桶/8.2公斤
+苹果:10桶/12.3公斤"></textarea>
+
+      <div style="margin-top:24px;">
+        <button class="btn btn-primary" onclick="parse()">
+          🚀 开始解析
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
-<script>
-function parse(){
-  const raw = document.getElementById('inputText').value
-  const lines = raw.split(/\n+/)
-    .map(l => l.trim())
-    .filter(l => l.length > 3 && !/单子\d+/.test(l))
-  
-  const tbody = document.getElementById('resultBody')
-  const summary = document.getElementById('summary')
-  tbody.innerHTML = ''
-  summary.innerHTML = ''
-  
-  let index = 1
-  let totalItems = 0
-  let zhongtong = 0
-  let datong = 0
-  let xiangzi = 0
+<!-- ================== 结果页面 ================== -->
+<div id="resultPage" class="page">
+  <div class="toolbar">
+    <button class="btn-back" onclick="goBack()">← 返回</button>
+    <div>
+      <!-- 移除了下载图表按钮 -->
+    </div>
+  </div>
 
-  // 匹配标准格式：名称:数字桶/数字公斤
-  const reg1 = /^(.+?):(\d+)(桶|箱)\/.*?(\d+(?:\.\d+)?)公斤/
-  // 匹配箱+桶+重量：名称:5箱/6桶/3.5公斤
-  const reg2 = /^(.+?):(\d+)箱\/\d+桶\/(\d+(?:\.\d+)?)公斤/
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📊 解析统计</div>
+    </div>
+    <div class="card-body">
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+          <div class="stat-label">总件数</div>
+          <div class="stat-value primary" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">中桶</div>
+          <div class="stat-value success" id="statZhong">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">大桶</div>
+          <div class="stat-value accent" id="statDa">0</div>
+        </div>
+      </div>
+
+      <div class="summary-bar" id="summaryBar">
+        <span class="dot"></span>
+        <span id="summaryText"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📦 订单明细</div>
+    </div>
+    <div class="card-body">
+      <div id="resultArea">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <p>解析完成，数据将展示在这里</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 提示框 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// 页面切换
+function showInputPage() {
+  document.getElementById('inputPage').classList.add('active');
+  document.getElementById('resultPage').classList.remove('active');
+}
+function showResultPage() {
+  document.getElementById('inputPage').classList.remove('active');
+  document.getElementById('resultPage').classList.add('active');
+}
+function goBack() {
+  showInputPage();
+}
+
+// 提示 - 修复错位问题
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  // 先清除之前的定时器
+  if (t.timer) clearTimeout(t.timer);
+  
+  t.textContent = msg;
+  t.classList.add('show');
+  
+  // 3秒后隐藏
+  t.timer = setTimeout(() => {
+    t.classList.remove('show');
+  }, 3000);
+}
+
+// 清空
+function clearInput() {
+  document.getElementById('inputText').value = '';
+  showToast('已清空输入内容');
+}
+
+// 重置结果
+function resetResults() {
+  document.getElementById('resultArea').innerHTML = `
+    <div class="empty-state"><div class="empty-icon">📊</div><p>解析完成，数据将展示在这里</p></div>`;
+}
+
+// 解析
+function parse() {
+  const raw = document.getElementById('inputText').value;
+  if (!raw.trim()) { 
+    showToast('请粘贴订单内容后再解析'); 
+    return; 
+  }
+
+  resetResults();
+  showResultPage();
+
+  const lines = raw.split(/\n+/).map(l => l.trim()).filter(l => l.length > 3);
+  const tbody = [];
+  let index = 1;
+  let totalItems = 0, zhongtong = 0, datong = 0, xiangzi = 0;
+
+  const reg1 = /^(.+?):(\d+)(桶|箱)\/.*?(\d+(?:\.\d+)?)公斤/;
+  const reg2 = /^(.+?):(\d+)箱\/\d+桶\/(\d+(?:\.\d+)?)公斤/;
 
   lines.forEach(line => {
-    let category, quantity, weight, remark, tag = ''
-    let weightNum = 0
-    let qtyNum = 0
-    
-    // 匹配 箱/桶/重量 格式
+    let category, quantity, weight, remark, weightNum = 0, qtyNum = 0;
+    let needTag = false; // 是否需要打标
+
     if (reg2.test(line)) {
-      const m = line.match(reg2)
-      category = m[1].trim()
-      quantity = m[2] + '箱'
-      weight = m[3] + 'kg'
-      weightNum = parseFloat(m[3])
-      qtyNum = parseInt(m[2])
-      remark = line.replace(reg2, '').replace(/^[,，\s]+/, '').trim()
-    }
-    // 匹配常规格式
-    else if (reg1.test(line)) {
-      const m = line.match(reg1)
-      category = m[1].trim()
-      quantity = m[2] + m[3]
-      weight = m[4] + 'kg'
-      weightNum = parseFloat(m[4])
-      qtyNum = parseInt(m[2])
-      remark = line.replace(reg1, '').replace(/^[,，\s]+/, '').trim()
-    }
-    else return
+      const m = line.match(reg2);
+      category = m[1].trim(); 
+      quantity = m[2]+'箱'; 
+      weight = m[3]+'kg';
+      weightNum = parseFloat(m[3]); 
+      qtyNum = parseInt(m[2]);
+      // 修复：移除多余逗号，清理所有标点和空白
+      remark = line.replace(reg2,'').replace(/^[,，、；；：：\s]+/, '').trim();
+      needTag = true; // 箱默认需要打标
+    } else if (reg1.test(line)) {
+      const m = line.match(reg1);
+      category = m[1].trim(); 
+      quantity = m[2]+m[3]; 
+      weight = m[4]+'kg';
+      weightNum = parseFloat(m[4]); 
+      qtyNum = parseInt(m[2]);
+      // 修复：移除多余逗号，清理所有标点和空白
+      remark = line.replace(reg1,'').replace(/^[,，、；；：：\s]+/, '').trim();
+      needTag = remark.includes('打印') || quantity.includes('箱');
+    } else return;
 
-    // 自动判断：包含打印 或 数量是箱 → 需要打标
-    if (remark.includes('打印') || quantity.includes('箱')) {
-      tag = '<span class="tag">需要打标</span>'
-    }
+    // 给需要打标的行添加样式类
+    const rowClass = needTag ? 'need-tag' : '';
 
-    // 统计分类
-    totalItems += qtyNum
-    if(weightNum < 10){
-      xiangzi += qtyNum
-    } else if(weightNum >=10 && weightNum <=20){
-      zhongtong += qtyNum
-    } else if(weightNum >=100 && weightNum <=200){
-      datong += qtyNum
-    }
+    totalItems += qtyNum;
+    if (weightNum < 10) xiangzi += qtyNum;
+    else if (weightNum <= 20) zhongtong += qtyNum;
+    else if (weightNum <= 200) datong += qtyNum;
 
-    const tr = document.createElement('tr')
-    tr.innerHTML = `
+    // 修改：移除操作要求列，添加行样式类
+    tbody.push(`<tr class="${rowClass}">
       <td>${index++}</td>
       <td>${category}</td>
       <td>${quantity}</td>
       <td>${weight}</td>
-      <td>${remark}</td>
-      <td>${tag}</td>
-    `
-    tbody.appendChild(tr)
-  })
+      <td>${remark||'—'}</td>
+    </tr>`);
+  });
 
-  // 输出合计
-  summary.innerHTML = `
-    【合计】总件数：${totalItems} 件<br>
-    其中：中桶：${zhongtong} 桶，大桶：${datong} 桶，箱子：${xiangzi} 件
-  `
+  if (index === 1) {
+    showToast('未识别到有效订单数据');
+    goBack();
+    return;
+  }
+
+  // 渲染表格：移除操作要求列
+  document.getElementById('resultArea').innerHTML = `
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>#</th><th>类目</th><th>数量</th><th>重量</th><th>备注</th></tr>
+        </thead>
+        <tbody>${tbody.join('')}</tbody>
+      </table>
+    </div>`;
+
+  // 统计
+  document.getElementById('statTotal').textContent = totalItems;
+  document.getElementById('statZhong').textContent = zhongtong;
+  document.getElementById('statDa').textContent = datong;
+
+  // 摘要
+  const summary = [`总件数 ${totalItems} 件`];
+  if (xiangzi) summary.push(`箱子 ${xiangzi} 件`);
+  if (zhongtong) summary.push(`中桶 ${zhongtong} 桶`);
+  if (datong) summary.push(`大桶 ${datong} 桶`);
+  document.getElementById('summaryText').textContent = summary.join('　·　');
+
+  showToast(`解析成功 · 共识别到 ${totalItems} 件商品`);
 }
+
+// 快捷键
+document.getElementById('inputText').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') parse();
+});
 </script>
 </body>
 </html>
