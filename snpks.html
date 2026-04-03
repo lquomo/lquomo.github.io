@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>苏宁评价提取工具</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:微软雅黑}
+        body{background:#f5f7fa;padding:30px}
+        .box{max-width:1100px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}
+        .title{text-align:center;font-size:24px;font-weight:bold;margin-bottom:25px;color:#333}
+        .main{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+        .area{display:flex;flex-direction:column;gap:10px}
+        label{font-size:16px;font-weight:bold;color:#444}
+        textarea{width:100%;height:500px;padding:15px;border:1px solid #ddd;border-radius:8px;font-size:14px;resize:none;background:#fafafa}
+        .btn-box{text-align:center;margin-top:25px}
+        button{padding:16px 60px;font-size:18px;font-weight:bold;background:#0099ff;color:white;border:none;border-radius:10px;cursor:pointer}
+        button:hover{background:#0080e0}
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="title">苏宁商品五星评价提取工具</div>
+        <div class="main">
+            <div class="area">
+                <label>📌 输入商品链接（一行一个）</label>
+                <textarea id="input" placeholder="例如：https://product.suning.com/0071616641/12443489789.html"></textarea>
+            </div>
+            <div class="area">
+                <label>✅ 输出结果（直接显示五星评价数）</label>
+                <textarea id="output" readonly placeholder="点击按钮直接出结果"></textarea>
+            </div>
+        </div>
+        <div class="btn-box">
+            <button id="startBtn">👉 一键获取五星评价数 👈</button>
+        </div>
+    </div>
+
+    <script>
+        const ipt = document.getElementById('input');
+        const opt = document.getElementById('output');
+        const btn = document.getElementById('startBtn');
+
+        btn.addEventListener('click', async () => {
+            const text = ipt.value.trim();
+            if (!text) { opt.value = '请输入链接！'; return; }
+            btn.disabled = true; btn.textContent = "获取中...";
+            opt.value = "";
+
+            const lines = text.split('\n').map(x=>x.trim()).filter(x=>x);
+            for (let n=0;n<lines.length;n++){
+                const url = lines[n];
+                const m = url.match(/product\.suning\.com\/(\w+)\/(\d+)\.html/);
+                if(!m){
+                    opt.value += `【商品${n+1}】\n链接：${url}\n结果：格式错误\n========================\n\n`;
+                    continue;
+                }
+                try{
+                    const shop = m[1];
+                    const goods = m[2];
+                    const api = `https://review.suning.com/ajax/review_count/general--0000000${goods}-${shop}-----satisfy.htm?callback=satisfy`;
+                    
+                    const res = await fetch(api);
+                    const txt = await res.text();
+                    const star = txt.match(/"fiveStarCount":(\d+)/)?.[1] || "获取失败";
+                    
+                    opt.value += `【商品${n+1}】\n链接：${url}\n五星评价数：${star}\n========================\n\n`;
+                }catch(e){
+                    opt.value += `【商品${n+1}】\n链接：${url}\n结果：获取失败\n========================\n\n`;
+                }
+                opt.scrollTop = opt.scrollHeight;
+            }
+            btn.disabled = false; btn.textContent = "👉 一键获取五星评价数 👈";
+        });
+    </script>
+</body>
+</html>
