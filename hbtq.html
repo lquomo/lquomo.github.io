@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>提取合并工具</title>
+<script src="xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft YaHei',Arial,sans-serif;background:#f0f2f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px}
+h1{color:#1a73e8;font-size:1.6rem;margin-bottom:18px}
+.panel{background:#fff;border-radius:12px;padding:20px;width:min(900px,100%);box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px}
+.section-title{font-size:.85rem;color:#666;margin-bottom:8px}
+.drop-zone{border:2px dashed #ccc;border-radius:8px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.drop-zone.drag{background:#e8f0fe;border-color:#1a73e8}
+.drop-zone:hover{border-color:#1a73e8}
+.drop-zone p{margin:6px 0;color:#888}
+.drop-zone .hint{font-size:.8rem;color:#aaa}
+input[type="file"]{display:none}
+input[type="text"]{width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:.9rem}
+input[type="text"]:focus{outline:none;border-color:#1a73e8}
+textarea{width:100%;height:100px;border:1px solid #ddd;border-radius:8px;padding:10px;font-family:monospace;font-size:.9rem;resize:vertical}
+textarea:focus{outline:none;border-color:#1a73e8}
+.btn-row{display:flex;gap:10px;margin-top:10px}
+button{background:#1a73e8;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-size:.9rem;cursor:pointer;transition:background .2s}
+button:hover{background:#1557b0}
+button.green{background:#34a853}
+button.green:hover{background:#267c3a}
+button.gray{background:#5f6368}
+button.gray:hover{background:#3c4043}
+button:disabled{opacity:.5;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:#e8f0fe;color:#1a56ca;border:1px solid #d2e3fc;border-radius:16px;padding:3px 10px;font-size:.8rem;display:flex;align-items:center;gap:4px}
+.chip .x{font-size:1rem;cursor:pointer;color:#5f6368;line-height:1}
+.chip .x:hover{color:#d93025}
+.result-box{background:#f8f9fa;border-radius:8px;padding:16px;font-size:1.1rem;color:#333;text-align:center}
+.result-box .count{font-size:2rem;color:#1a73e8;font-weight:bold}
+.filename-input{margin-top:12px}
+.hint-text{font-size:.8rem;color:#888;margin-top:4px}
+.stats-box{background:#e8f0fe;border-radius:8px;padding:12px;margin-top:12px;font-size:.85rem;color:#444}
+.stats-box .stat-item{display:inline-block;margin:4px 12px 4px 0}
+.stats-box .stat-value{color:#1a73e8;font-weight:bold}
+.warning{color:#d93025;font-weight:bold}
+.warning-box{background:#fce8e8;border:1px solid #f5c6c6;border-radius:8px;padding:12px;margin-top:12px}
+.warning-box h4{color:#c5221f;margin-bottom:8px;font-size:.9rem}
+.warning-box .source-group{margin:8px 0;padding:8px;background:#fff;border-radius:6px}
+.warning-box .source-name{font-weight:bold;color:#1a73e8;margin-bottom:4px}
+.warning-box ul{margin-left:18px;font-size:.85rem;color:#555}
+.warning-box li{margin:3px 0}
+.log-box{font-family:monospace;font-size:.75rem;color:#555;background:#f8f9fa;border-radius:8px;padding:10px;max-height:160px;overflow-y:auto}
+.log-box .ok{color:#137333}
+.log-box .err{color:#c5221f}
+.footer{color:#aaa;font-size:.75rem;margin-top:16px;text-align:center}
+</style>
+</head>
+<body>
+<h1>提取合并工具</h1>
+
+<div class="panel">
+  <div class="section-title">📁 拖入 Excel 文件（.xlsx .xls）</div>
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <p>将 Excel 文件拖到此处</p>
+    <p>或点击选择文件</p>
+    <div class="hint">支持 .xlsx / .xls，自动读取第一个工作表 A 列</div>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div class="panel">
+  <div class="section-title">✏️ 手动输入 / 粘贴数字</div>
+  <textarea id="manualInput" placeholder="粘贴数字文本，系统自动提取5位以上数字"></textarea>
+  <div class="btn-row">
+    <button onclick="processManual()">提取数字</button>
+    <button class="gray" onclick="document.getElementById('manualInput').value='';clearManual()">清空</button>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="section-title">📋 提取结果</div>
+  <div class="result-box" id="resultBox">
+    <div>等待输入…</div>
+  </div>
+  
+  <div id="statsArea"></div>
+  <div id="warningArea"></div>
+  
+  <div class="filename-input">
+    <div class="section-title">📝 导出文件名（可选）</div>
+    <input type="text" id="customName" placeholder="输入自定义名称，如：联通订单">
+    <div class="hint-text">最终文件名格式：0419-自定义名-50单.xlsx（B列包含校验提醒，无表头，保留重复）</div>
+  </div>
+  
+  <div class="btn-row" style="justify-content:center;margin-top:16px">
+    <button class="green" onclick="exportXLSX()" id="exportBtn" disabled>📥 导出 Excel</button>
+    <button class="gray" onclick="clearAll()" id="clearBtn" disabled>清空</button>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="section-title">📝 运行日志</div>
+  <div class="log-box" id="logBox"><span class="ok">程序已就绪，等待文件…</span></div>
+</div>
+
+<div class="footer">纯前端运行 · 数据校验 · 重复/位数/前缀提醒</div>
+
+<script>
+// fileResults: {filename: [{value, source}]}
+// results: [{value, source, warnings: [], isDuplicate}]
+let results = [];
+let fileResults = {};
+let stats = {total: 0, unique: 0, duplicates: 0, digitIssues: 0, prefixIssues: 0};
+
+function log(msg, type='ok') {
+  const lb = document.getElementById('logBox');
+  lb.innerHTML += '<br><span class="'+type+'">['+new Date().toLocaleTimeString()+'] '+msg+'</span>';
+  lb.scrollTop = lb.scrollHeight;
+}
+
+function analyzeData(allItems) {
+  // allItems: [{value, source}] - 包含重复
+  const total = allItems.length;
+  
+  // 统计每个值的出现次数和来源
+  const valueInfo = {};
+  allItems.forEach(item => {
+    if (!valueInfo[item.value]) {
+      valueInfo[item.value] = {count: 0, sources: new Set()};
+    }
+    valueInfo[item.value].count++;
+    valueInfo[item.value].sources.add(item.source);
+  });
+  
+  // 找出重复的值
+  const duplicateValues = new Set();
+  for (const [val, info] of Object.entries(valueInfo)) {
+    if (info.count > 1) {
+      duplicateValues.add(val);
+    }
+  }
+  
+  // 构建结果（保留所有数据，标记重复）
+  const result = allItems.map((item, idx) => ({
+    value: item.value,
+    source: item.source,
+    index: idx,
+    warnings: [],
+    isDuplicate: duplicateValues.has(item.value)
+  }));
+  
+  // 添加重复警告
+  result.forEach(item => {
+    if (item.isDuplicate) {
+      item.warnings.push('重复');
+    }
+  });
+  
+  // 2. 位数校验（90%以上相同位数为主位数）
+  const digitCount = {};
+  allItems.forEach(item => {
+    const d = item.value.length;
+    digitCount[d] = (digitCount[d] || 0) + 1;
+  });
+  let mainDigit = null;
+  for (const [digit, count] of Object.entries(digitCount)) {
+    if (count / total >= 0.9) {
+      mainDigit = parseInt(digit);
+      break;
+    }
+  }
+  if (mainDigit !== null) {
+    result.forEach(item => {
+      if (item.value.length !== mainDigit) {
+        if (!item.warnings.includes('位数与大多数不符')) {
+          item.warnings.push('位数与大多数不符');
+        }
+      }
+    });
+  }
+  
+  // 3. 前缀校验（前两位占比<10%给出提示）
+  const prefixCount = {};
+  allItems.forEach(item => {
+    const prefix = item.value.substring(0, 2);
+    prefixCount[prefix] = (prefixCount[prefix] || 0) + 1;
+  });
+  const lowFreqPrefixes = [];
+  for (const [prefix, count] of Object.entries(prefixCount)) {
+    if (count / total < 0.1) {
+      lowFreqPrefixes.push(prefix);
+    }
+  }
+  result.forEach(item => {
+    const prefix = item.value.substring(0, 2);
+    if (lowFreqPrefixes.includes(prefix)) {
+      if (!item.warnings.includes('前缀占比低')) {
+        item.warnings.push('前缀占比低');
+      }
+    }
+  });
+  
+  // 统计
+  const uniqueCount = Object.keys(valueInfo).length;
+  const dupItemCount = result.filter(r => r.isDuplicate).length;
+  
+  stats = {
+    total: total,
+    unique: uniqueCount,
+    duplicates: dupItemCount,
+    digitIssues: mainDigit !== null ? result.filter(r => r.warnings.includes('位数与大多数不符')).length : 0,
+    prefixIssues: result.filter(r => r.warnings.includes('前缀占比低')).length,
+    mainDigit: mainDigit,
+    digitDistribution: digitCount,
+    prefixDistribution: prefixCount
+  };
+  
+  return result;
+}
+
+function showResults() {
+  const box = document.getElementById('resultBox');
+  if (results.length === 0) {
+    box.innerHTML = '<div>未提取到数据</div>';
+    document.getElementById('exportBtn').disabled = true;
+    document.getElementById('clearBtn').disabled = false;
+    document.getElementById('statsArea').innerHTML = '';
+    document.getElementById('warningArea').innerHTML = '';
+    return;
+  }
+  
+  const warningCount = results.filter(r => r.warnings.length > 0).length;
+  let html = '<div>共提取到</div><div class="count">'+results.length+'</div><div>条数据</div>';
+  html += '<div style="font-size:.9rem;color:#666;margin-top:4px">（去重后 '+stats.unique+' 条）</div>';
+  if (warningCount > 0) {
+    html += '<div style="color:#d93025;margin-top:8px">⚠️ '+warningCount+' 条需要关注</div>';
+  }
+  box.innerHTML = html;
+  document.getElementById('exportBtn').disabled = false;
+  document.getElementById('clearBtn').disabled = false;
+  
+  showStats();
+  showWarningBySource();
+}
+
+function showStats() {
+  let html = '<div class="stats-box">';
+  html += '<span class="stat-item">总数: <span class="stat-value">'+stats.total+'</span></span>';
+  html += '<span class="stat-item">去重: <span class="stat-value">'+stats.unique+'</span></span>';
+  html += '<span class="stat-item">重复: <span class="stat-value">'+stats.duplicates+'</span></span>';
+  if (stats.mainDigit !== null) {
+    html += '<span class="stat-item">主位数: <span class="stat-value">'+stats.mainDigit+'位</span></span>';
+    html += '<span class="stat-item">位数异常: <span class="stat-value">'+stats.digitIssues+'</span></span>';
+  }
+  html += '<span class="stat-item">前缀异常: <span class="stat-value">'+stats.prefixIssues+'</span></span>';
+  html += '</div>';
+  document.getElementById('statsArea').innerHTML = html;
+}
+
+function showWarningBySource() {
+  // 按来源分组显示警告（包括重复警告）
+  const sourceWarnings = {};
+  results.forEach(item => {
+    if (item.warnings.length === 0) return;
+    const src = item.source;
+    if (!sourceWarnings[src]) {
+      sourceWarnings[src] = [];
+    }
+    sourceWarnings[src].push({
+      value: item.value,
+      warnings: item.warnings
+    });
+  });
+  
+  if (Object.keys(sourceWarnings).length === 0) {
+    document.getElementById('warningArea').innerHTML = '';
+    return;
+  }
+  
+  let html = '<div class="warning-box"><h4>⚠️ 校验提醒（按来源分组）</h4>';
+  for (const [source, items] of Object.entries(sourceWarnings)) {
+    html += '<div class="source-group">';
+    html += '<div class="source-name">📄 ' + source + ' (' + items.length + '条异常)</div>';
+    html += '<ul>';
+    items.slice(0, 10).forEach(item => {
+      html += '<li>' + item.value + ' — ' + item.warnings.join('、') + '</li>';
+    });
+    if (items.length > 10) {
+      html += '<li>... 还有 ' + (items.length - 10) + ' 条 ...</li>';
+    }
+    html += '</ul></div>';
+  }
+  html += '</div>';
+  document.getElementById('warningArea').innerHTML = html;
+}
+
+function updateChips() {
+  const container = document.getElementById('chips');
+  container.innerHTML = '';
+  Object.keys(fileResults).forEach(name => {
+    const count = fileResults[name].length;
+    const span = document.createElement('span');
+    span.className = 'chip';
+    span.innerHTML = name+' ('+count+') <span class="x" onclick="removeFile(\''+name.replace(/'/g,"\\'")+'\')">×</span>';
+    container.appendChild(span);
+  });
+}
+
+function removeFile(name) {
+  delete fileResults[name];
+  updateChips();
+  mergeAndShow();
+}
+
+function mergeAndShow() {
+  // 合并所有数据（保留重复）
+  const allItems = [];
+  for (const [source, items] of Object.entries(fileResults)) {
+    items.forEach(val => {
+      allItems.push({value: val, source: source});
+    });
+  }
+  results = analyzeData(allItems);
+  showResults();
+}
+
+function clearManual() {
+  delete fileResults['手动输入'];
+  updateChips();
+  mergeAndShow();
+}
+
+function extractNumbers(text) {
+  const numbers = [];
+  const numPat = /\d{5,}/g;
+  let m;
+  while ((m = numPat.exec(text)) !== null) {
+    numbers.push(m[0]);
+  }
+  return numbers;
+}
+
+function processManual() {
+  const text = document.getElementById('manualInput').value;
+  if (!text.trim()) { log('手动输入为空', 'err'); return; }
+  const numbers = extractNumbers(text);
+  fileResults['手动输入'] = numbers;
+  updateChips();
+  mergeAndShow();
+  log('手动输入 → 提取到 '+numbers.length+' 条', 'ok');
+}
+
+function processExcelFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+        
+        const numbers = [];
+        const numPat = /\d{5,}/g;
+        
+        for (let row of jsonData) {
+          if (row && row[0] != null) {
+            const text = String(row[0]);
+            let m;
+            while ((m = numPat.exec(text)) !== null) {
+              numbers.push(m[0]);
+            }
+          }
+        }
+        resolve(numbers);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function processFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.name.match(/\.xlsx?$/i)) {
+      log('跳过非Excel文件: '+file.name, 'err');
+      return;
+    }
+    log('处理中: '+file.name+'…');
+    processExcelFile(file)
+      .then(numbers => {
+        fileResults[file.name] = numbers;
+        updateChips();
+        mergeAndShow();
+        log(file.name+' — 提取到 '+numbers.length+' 条', 'ok');
+      })
+      .catch(err => {
+        log(file.name+' — 错误: '+err.message, 'err');
+      });
+  });
+}
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); processFiles(e.dataTransfer.files); });
+document.getElementById('fileInput').addEventListener('change', e=>processFiles(e.target.files));
+
+function clearAll() {
+  fileResults = {};
+  results = [];
+  stats = {total: 0, unique: 0, duplicates: 0, digitIssues: 0, prefixIssues: 0};
+  document.getElementById('customName').value = '';
+  updateChips();
+  document.getElementById('resultBox').innerHTML = '<div>等待输入…</div>';
+  document.getElementById('statsArea').innerHTML = '';
+  document.getElementById('warningArea').innerHTML = '';
+  document.getElementById('exportBtn').disabled = true;
+  document.getElementById('clearBtn').disabled = true;
+  log('已清空');
+}
+
+function exportXLSX() {
+  if (!results.length) return;
+  
+  const customName = document.getElementById('customName').value.trim();
+  const today = new Date();
+  const mmdd = String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
+  const safeName = customName ? customName.replace(/[\\/:*?"<>|]/g, '').substring(0,30) : '提取结果';
+  const filename = mmdd + '-' + safeName + '-' + results.length + '单.xlsx';
+  
+  // 创建 Excel: 无表头，A列数值, B列提醒（包含重复标记）
+  const wsData = [];
+  results.forEach(item => {
+    wsData.push([item.value, item.warnings.join('、')]);
+  });
+  
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch: 20}, {wch: 30}];
+  
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '提取结果');
+  
+  XLSX.writeFile(wb, filename);
+  log('已导出: '+filename, 'ok');
+}
+</script>
+</body>
+</html>
