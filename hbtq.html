@@ -428,8 +428,7 @@ function exportXLSX() {
   const today = new Date();
   const mmdd = String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
   const safeName = customName ? customName.replace(/[\\/:*?"<>|]/g, '').substring(0,30) : '提取结果';
-  const filename = mmdd + '-' + safeName + '-' + results.length + '单.xlsx';
-  
+  const filename = results.length + '单-' + safeName + '-' + mmdd + '.xlsx';
   // 创建 Excel: 无表头，A列数值, B列提醒（包含重复标记）
   const wsData = [];
   results.forEach(item => {
