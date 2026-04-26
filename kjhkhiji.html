@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+ <title>购物评价生成器</title>
+ <style>
+ * {
+ margin: 0;
+ padding: 0;
+ box-sizing: border-box;
+ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+ }
+
+ body {
+ background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+ min-height: 100vh;
+ padding: 16px;
+ overflow-x: hidden;
+ }
+
+ .page {
+ max-width: 540px;
+ margin: 0 auto;
+ background: #ffffff;
+ border-radius: 20px;
+ box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+ padding: 24px;
+ display: none;
+ opacity: 0;
+ transform: translateY(20px);
+ transition: all 0.3s ease;
+ }
+
+ .page.active {
+ display: block;
+ opacity: 1;
+ transform: translateY(0);
+ }
+
+ h1 {
+ text-align: center;
+ color: #2d3748;
+ font-size: 22px;
+ font-weight: 600;
+ margin-bottom: 20px;
+ position: relative;
+ }
+
+ h1::after {
+ content: "";
+ display: block;
+ width: 40px;
+ height: 3px;
+ background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+ margin: 8px auto 0;
+ border-radius: 3px;
+ }
+
+ #generatePage .form-group {
+ margin-bottom: 16px;
+ }
+
+ #generatePage label {
+ display: block;
+ color: #4a5568;
+ font-size: 14px;
+ font-weight: 500;
+ margin-bottom: 8px;
+ }
+
+ #generatePage input {
+ width: 100%;
+ padding: 14px;
+ border: 1px solid #e2e8f0;
+ border-radius: 12px;
+ font-size: 14px;
+ color: #2d3748;
+ background: #f8fafc;
+ transition: border 0.3s ease;
+ }
+
+ #generatePage input:focus {
+ outline: none;
+ border-color: #667eea;
+ box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+ }
+
+ .generate-btn {
+ width: 100%;
+ background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+ color: white;
+ border: none;
+ border-radius: 12px;
+ padding: 18px;
+ font-size: 16px;
+ font-weight: 600;
+ margin-top: 8px;
+ cursor: pointer;
+ transition: transform 0.2s ease;
+ box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+ }
+
+ .generate-btn:active {
+ transform: scale(0.98);
+ }
+
+ .generate-btn.loading {
+ opacity: 0.8;
+ pointer-events: none;
+ }
+
+ .progress-container {
+ width: 100%;
+ height: 20px;
+ background: #f1f5f9;
+ border-radius: 10px;
+ margin: 16px 0;
+ overflow: hidden;
+ display: none;
+ }
+
+ .progress-bar {
+ height: 100%;
+ background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+ border-radius: 10px;
+ width: 0%;
+ transition: width 0.3s ease;
+ }
+
+ .progress-text {
+ text-align: center;
+ color: #64748b;
+ font-size: 14px;
+ margin-bottom: 8px;
+ display: none;
+ }
+
+ #copyPage .current-review {
+ background: #f8fafc;
+ border-radius: 16px;
+ padding: 20px;
+ margin-bottom: 24px;
+ border: 1px solid #e2e8f0;
+ min-height: 80px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ text-align: center;
+ }
+
+ #copyPage .current-review-text {
+ font-size: 16px;
+ color: #2d3748;
+ line-height: 1.6;
+ }
+
+ #copyPage .count-tip {
+ text-align: center;
+ color: #667eea;
+ font-size: 18px;
+ font-weight: 600;
+ margin-bottom: 20px;
+ }
+
+ .big-copy-btn {
+ width: 100%;
+ height: 220px;
+ border: none;
+ border-radius: 20px;
+ color: white;
+ font-size: 30px;
+ font-weight: 700;
+ cursor: pointer;
+ transition: all 0.3s ease;
+ box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+ margin-bottom: 16px;
+ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+ }
+
+ .big-copy-btn:active {
+ transform: scale(0.98);
+ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+ }
+
+ .big-copy-btn.disabled {
+ opacity: 0.7;
+ pointer-events: none;
+ background: #a0aec0 !important;
+ }
+
+ .back-btn {
+ width: 100%;
+ background: #f8fafc;
+ color: #4a5568;
+ border: 1px solid #e2e8f0;
+ border-radius: 12px;
+ padding: 16px;
+ font-size: 16px;
+ font-weight: 500;
+ cursor: pointer;
+ transition: background 0.3s ease;
+ }
+
+ .back-btn:active {
+ background: #e2e8f0;
+ }
+
+ .toast {
+ position: fixed;
+ bottom: 40px;
+ left: 50%;
+ transform: translateX(-50%);
+ background: rgba(45, 55, 72, 0.9);
+ color: white;
+ padding: 12px 24px;
+ border-radius: 8px;
+ font-size: 15px;
+ display: none;
+ z-index: 9999;
+ min-width: 200px;
+ text-align: center;
+ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+ }
+
+ @media (max-width: 375px) {
+ .big-copy-btn {
+ height: 180px;
+ font-size: 26px;
+ }
+ #copyPage .current-review {
+ padding: 16px;
+ }
+ .page {
+ padding: 18px;
+ }
+ }
+ </style>
+</head>
+<body>
+ <div class="page active" id="generatePage">
+ <h1>生成购物评价</h1>
+
+ <div class="form-group">
+ <label for="keywords">评价关键词（例：手机 续航好 拍照清晰）</label>
+ <input type="text" id="keywords" placeholder="输入评价核心关键词，多个用空格分隔">
+ </div>
+
+ <div class="form-group">
+ <label for="reviewCount">生成评价条数</label>
+ <input type="number" id="reviewCount" value="20" min="1" max="50" placeholder="请输入要生成的条数">
+ </div>
+
+ <div class="progress-text" id="progressText">生成进度：0/0 (0%)</div>
+ <div class="progress-container" id="progressContainer">
+ <div class="progress-bar" id="progressBar"></div>
+ </div>
+
+ <button class="generate-btn" id="generateBtn">生成评价 → 进入复制页</button>
+ </div>
+
+ <div class="page" id="copyPage">
+ <h1>复制评价</h1>
+ <div class="current-review" id="currentReview">
+ <span class="current-review-text" id="currentReviewText">暂无评价，请先生成</span>
+ </div>
+ <div class="count-tip" id="countTip">剩余评价：0</div>
+ <button class="big-copy-btn disabled" id="bigCopyBtn">点击复制</button>
+ <button class="back-btn" id="backBtn">← 返回重新生成</button>
+ </div>
+
+ <div class="toast" id="toast"></div>
+
+ <script>
+ const KEY_PREFIX = 'sk-ingcqawsqsnffqucbkxsdrhpq';
+
+ function getFullApiKey() {
+ const urlParams = new URLSearchParams(window.location.search);
+ const keySuffix = urlParams.get('key') || '';
+ return KEY_PREFIX + keySuffix;
+ }
+
+ const generatePage = document.getElementById('generatePage');
+ const copyPage = document.getElementById('copyPage');
+ const keywordsInput = document.getElementById('keywords');
+ const reviewCountInput = document.getElementById('reviewCount');
+ const generateBtn = document.getElementById('generateBtn');
+ const bigCopyBtn = document.getElementById('bigCopyBtn');
+ const backBtn = document.getElementById('backBtn');
+ const currentReviewText = document.getElementById('currentReviewText');
+ const countTip = document.getElementById('countTip');
+ const toast = document.getElementById('toast');
+
+ const progressText = document.getElementById('progressText');
+ const progressContainer = document.getElementById('progressContainer');
+ const progressBar = document.getElementById('progressBar');
+
+ let reviewArray = [];
+ const btnColors = [
+ 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+ 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+ 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+ 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+ 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+ ];
+ let currentColorIndex = 0;
+
+ function showToast(msg, duration = 1500) {
+ toast.innerText = msg;
+ toast.style.display = 'block';
+ setTimeout(() => toast.style.display = 'none', duration);
+ }
+
+ function updateCopyUI() {
+ const count = reviewArray.length;
+ countTip.textContent = `剩余评价：${count}`;
+
+ if (count > 0) {
+ currentReviewText.textContent = reviewArray[0];
+ bigCopyBtn.classList.remove('disabled');
+ } else {
+ currentReviewText.textContent = '所有评价已复制完成';
+ bigCopyBtn.classList.add('disabled');
+ }
+ }
+
+ function changeBtnColor() {
+ currentColorIndex = (currentColorIndex + 1) % btnColors.length;
+ bigCopyBtn.style.background = btnColors[currentColorIndex];
+ }
+
+ function switchPage(fromPage, toPage) {
+ fromPage.classList.remove('active');
+ toPage.classList.add('active');
+ window.scrollTo(0, 0);
+ }
+
+ function updateProgress(current, total) {
+ const percent = Math.round((current / total) * 100);
+ progressText.textContent = `生成进度：${current}/${total} (${percent}%)`;
+ progressBar.style.width = `${percent}%`;
+ progressText.style.display = 'block';
+ progressContainer.style.display = 'block';
+ }
+
+ function resetProgress() {
+ progressText.textContent = '生成进度：0/0 (0%)';
+ progressBar.style.width = '0%';
+ progressText.style.display = 'none';
+ progressContainer.style.display = 'none';
+ }
+
+ async function generateReviews(keywords, targetCount) {
+ const apiKey = getFullApiKey();
+
+ if (!apiKey || apiKey === KEY_PREFIX) {
+ showToast('请在 URL 后面加上 ?key=xxx 参数传入 key 后半段');
+ return null;
+ }
+
+ if (!keywords || keywords.trim() === '') {
+ showToast('请输入评价关键词');
+ return null;
+ }
+
+ if (!targetCount || targetCount < 1 || targetCount > 200) {
+ showToast('请输入1-200之间的有效条数');
+ return null;
+ }
+
+ resetProgress();
+ updateProgress(0, targetCount);
+
+ const prompt = `
+请严格按照以下要求生成${targetCount}条购物评价：
+1. 核心关键词：${keywords}
+2. 每条评价自然真实，符合普通消费者口吻，长度15-35字
+3. 每条评价单独一行，仅包含评价内容，无编号、无多余文字
+4. 评价内容积极正面，贴合关键词
+5. 必须生成满${targetCount}条，不多不少
+6. 仅输出评价内容，不要任何解释、标题或额外说明
+ `.trim();
+
+ const headers = new Headers();
+ headers.append('Content-Type', 'application/json; charset=utf-8');
+ headers.append('Authorization', `Bearer ${apiKey}`);
+
+ const controller = new AbortController();
+ const timeout = setTimeout(() => controller.abort(), 120000);
+
+ try {
+ const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+ method: 'POST',
+ headers: headers,
+ body: JSON.stringify({
+ model: 'deepseek-ai/DeepSeek-V4-Flash',
+ messages: [{ role: 'user', content: prompt }],
+ temperature: 0.7,
+ max_tokens: targetCount * 60,
+ stream: true
+ }),
+ signal: controller.signal
+ });
+
+ if (!response.ok) {
+ const errData = await response.json().catch(() => ({}));
+ showToast(`API调用失败：${errData.error?.message || `HTTP错误 ${response.status}`}`);
+ resetProgress();
+ clearTimeout(timeout);
+ return null;
+ }
+
+ const reader = response.body.getReader();
+ const decoder = new TextDecoder('utf-8');
+ let fullContent = '';
+
+ while (true) {
+ const { done, value } = await reader.read();
+ if (done) break;
+
+ const chunk = decoder.decode(value, { stream: true });
+ const lines = chunk.split('\n').filter(line => line.trim() !== '' && line.startsWith('data:'));
+
+ for (const line of lines) {
+ const data = line.replace(/^data:\s*/, '');
+ if (data === '[DONE]') continue;
+
+ try {
+ const parsed = JSON.parse(data);
+ const content = parsed.choices?.[0]?.delta?.content || '';
+ if (content) {
+ fullContent += content;
+ const reviews = fullContent.split('\n').filter(item => item.trim() !== '');
+ const currentCount = Math.min(reviews.length, targetCount);
+ updateProgress(currentCount, targetCount);
+ }
+ } catch (e) {
+ continue;
+ }
+ }
+ }
+
+ clearTimeout(timeout);
+
+ let reviews = fullContent.split('\n').filter(item => item.trim() !== '');
+
+ if (reviews.length < targetCount) {
+ showToast(`仅生成${reviews.length}条，未达到目标${targetCount}条`);
+ } else if (reviews.length > targetCount) {
+ reviews = reviews.slice(0, targetCount);
+ }
+
+ resetProgress();
+ return reviews.length > 0 ? reviews : null;
+
+ } catch (err) {
+ clearTimeout(timeout);
+ if (err.name === 'AbortError') {
+ showToast('请求超时，请稍后重试');
+ } else {
+ showToast(`生成失败：${err.message || '未知错误'}`);
+ }
+ resetProgress();
+ console.error('详细错误信息：', err);
+ return null;
+ }
+ }
+
+ generateBtn.addEventListener('click', async () => {
+ generateBtn.classList.add('loading');
+ generateBtn.innerText = '生成中...';
+
+ const keywords = keywordsInput.value;
+ const targetCount = parseInt(reviewCountInput.value);
+
+ const reviews = await generateReviews(keywords, targetCount);
+
+ generateBtn.classList.remove('loading');
+ generateBtn.innerText = '生成评价 → 进入复制页';
+
+ if (!reviews) return;
+
+ reviewArray = reviews;
+ currentColorIndex = 0;
+ bigCopyBtn.style.background = btnColors[0];
+
+ updateCopyUI();
+ switchPage(generatePage, copyPage);
+ showToast(`成功生成 ${reviews.length} 条评价`);
+ });
+
+ bigCopyBtn.addEventListener('click', () => {
+ if (reviewArray.length === 0) {
+ showToast('已无剩余评价');
+ return;
+ }
+
+ const currentReview = reviewArray.shift().trim();
+ const tempTextarea = document.createElement('textarea');
+ tempTextarea.value = currentReview;
+ document.body.appendChild(tempTextarea);
+ tempTextarea.select();
+ document.execCommand('copy');
+ document.body.removeChild(tempTextarea);
+
+ changeBtnColor();
+ updateCopyUI();
+ showToast('复制成功！');
+ });
+
+ backBtn.addEventListener('click', () => {
+ switchPage(copyPage, generatePage);
+ });
+ </script>
+</body>
+</html>
