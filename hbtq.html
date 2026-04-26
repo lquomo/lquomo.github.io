@@ -51,6 +51,52 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .log-box .ok{color:#137333}
 .log-box .err{color:#c5221f}
 .footer{color:#aaa;font-size:.75rem;margin-top:16px;text-align:center}
+
+/* 开关样式 */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #1a73e8;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
 </style>
 </head>
 <body>
@@ -89,6 +135,14 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="section-title">📝 导出文件名（可选）</div>
     <input type="text" id="customName" placeholder="输入自定义名称，如：联通订单">
     <div class="hint-text">最终文件名格式：0419-自定义名-50单.xlsx（B列包含校验提醒，无表头，保留重复）</div>
+    
+    <!-- 新增开关 -->
+    <div class="section-title" style="margin-top: 12px;">📊 导出数据来源</div>
+    <label class="switch">
+      <input type="checkbox" id="includeSourceToggle" checked>
+      <span class="slider"></span>
+    </label>
+    <span style="margin-left: 8px; font-size: 0.85rem; color: #666;">开启后将在C列显示数据来源</span>
   </div>
   
   <div class="btn-row" style="justify-content:center;margin-top:16px">
@@ -412,6 +466,7 @@ function clearAll() {
   results = [];
   stats = {total: 0, unique: 0, duplicates: 0, digitIssues: 0, prefixIssues: 0};
   document.getElementById('customName').value = '';
+  document.getElementById('includeSourceToggle').checked = true; // 重置开关为开启状态
   updateChips();
   document.getElementById('resultBox').innerHTML = '<div>等待输入…</div>';
   document.getElementById('statsArea').innerHTML = '';
@@ -425,18 +480,32 @@ function exportXLSX() {
   if (!results.length) return;
   
   const customName = document.getElementById('customName').value.trim();
+  const includeSource = document.getElementById('includeSourceToggle').checked; // 获取开关状态
   const today = new Date();
   const mmdd = String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
   const safeName = customName ? customName.replace(/[\\/:*?"<>|]/g, '').substring(0,30) : '提取结果';
-  const filename = results.length + '单-' + safeName + '-' + mmdd + '.xlsx';
-  // 创建 Excel: 无表头，A列数值, B列提醒（包含重复标记）
+  const filename = mmdd + '-' + safeName + '-' + results.length + '单.xlsx';
+  
+  // 创建 Excel: 无表头，A列数值, B列提醒（包含重复标记），C列来源（如果开启）
   const wsData = [];
   results.forEach(item => {
-    wsData.push([item.value, item.warnings.join('、')]);
+    if (includeSource) {
+      // 包含来源列
+      wsData.push([item.value, item.warnings.join('、'), item.source]);
+    } else {
+      // 不包含来源列
+      wsData.push([item.value, item.warnings.join('、')]);
+    }
   });
   
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch: 20}, {wch: 30}];
+  
+  // 设置列宽，根据是否包含来源列调整
+  if (includeSource) {
+    ws['!cols'] = [{wch: 20}, {wch: 15}, {wch: 30}];
+  } else {
+    ws['!cols'] = [{wch: 20}, {wch: 15}];
+  }
   
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '提取结果');
