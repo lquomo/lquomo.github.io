@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>二维码工具</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Microsoft YaHei',Arial,sans-serif;background:#f0f2f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px}
+  h1{color:#1a73e8;font-size:1.6rem;margin-bottom:18px}
+  .panel{background:#fff;border-radius:12px;padding:20px;width:min(900px,100%);box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px}
+  .section-title{font-size:.85rem;color:#666;margin-bottom:8px}
+  .drop-zone{border:2px dashed #ccc;border-radius:8px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+  .drop-zone.drag{background:#e8f0fe;border-color:#1a73e8}
+  .drop-zone:hover{border-color:#1a73e8}
+  .drop-zone p{margin:6px 0;color:#888}
+  #fileInput{position:absolute;width:100%;height:100%;top:0;left:0;opacity:0;cursor:pointer}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:10px}
+  th{background:#f8f9fa;text-align:left;padding:10px;color:#555;font-weight:normal;border-bottom:1px solid #eee}
+  td{padding:12px;border-bottom:1px solid #eee;color:#333;vertical-align:top}
+  .warning{color:#d93025;font-weight:bold}
+  .chip{display:inline-block;background:#e8f0fe;color:#1a56ca;border-radius:12px;padding:2px 8px;font-size:.85rem;margin-right:4px}
+  .stats-box{background:#f8f9fa;border-radius:8px;padding:12px;margin-top:12px;font-size:.85rem;color:#444;display:none}
+  .stat-item{margin-right:16px}
+  .stat-value{color:#1a73e8;font-weight:bold}
+  .log{color:#888;font-size:.8rem;margin-top:10px;text-align:center}
+  .footer{margin-top:auto;color:#999;font-size:.8rem;text-align:center;margin-bottom:10px}
+</style>
+<!-- 确保同级目录下有 jsQR.js 文件 -->
+<script src="jsQR.js"></script>
+</head>
+<body>
+
+  <h1>完全离线二维码工具</h1>
+
+  <div class="panel">
+    <div class="section-title">📸 拖入二维码图片 (纯离线解析)</div>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*" multiple>
+      <p>👇 拖入图片或点击选择</p>
+      <p style="font-size:0.8rem;color:#aaa">请确保已加载 jsQR.js 库</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-title">📋 解析结果与比对</div>
+    <div id="resultArea">
+      <p style="color:#888;text-align:center;padding:20px;">等待操作...</p>
+    </div>
+    <div class="stats-box" id="statsBox">
+      <span class="stat-item">总数: <span id="total" class="stat-value">0</span></span>
+      <span class="stat-item">重复: <span id="duplicates" class="stat-value">0</span></span>
+    </div>
+    <div class="log" id="log">就绪</div>
+  </div>
+
+  <div class="footer">
+    <time_location>
+    当前时间：2026-05-03 星期一
+    当前地点：山东省 济宁市
+    </time_location>
+  </div>
+
+<script>
+  let parsedData = [];
+  const logEl = document.getElementById('log');
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const resultArea = document.getElementById('resultArea');
+  const statsBox = document.getElementById('statsBox');
+
+  // 事件监听
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  function handleFiles(files) {
+    if (files.length === 0) return;
+    logEl.textContent = `正在处理 ${files.length} 个文件...`;
+    Array.from(files).forEach(file => {
+      if (!file.type.match('image.*')) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => decodeQR(img, file.name);
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function decodeQR(img, fileName) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = window.jsQR ? window.jsQR(imageData.data, imageData.width, imageData.height) : null;
+
+    if (code) {
+      processExtractedURL(code.data, fileName);
+      logEl.textContent = `成功解析: ${fileName}`;
+    } else {
+      logEl.textContent = `解析失败: ${fileName} (请检查图片清晰度)`;
+      const url = prompt(`无法自动解析 ${fileName}，请手动输入链接或内容：`);
+      if(url) processExtractedURL(url, fileName + "(手动)");
+    }
+  }
+
+  function processExtractedURL(url, sourceName) {
+    let productId = "未知";
+    let channelId = "未找到";
+    
+    try {
+      const urlObj = new URL(url);
+      const params = new URLSearchParams(urlObj.search);
+      productId = params.get('id') || "无ID";
+      channelId = params.get('channel_id') || "无Channel";
+    } catch(e) {
+      logEl.textContent = "URL格式错误: " + e.message;
+    }
+
+    // 检查重复逻辑：检查商品ID或渠道ID是否已存在
+    const existingItem = parsedData.find(item => 
+      item.id === productId || item.channel === channelId
+    );
+
+    let status = '✅ 新码';
+    let remark = '无重复';
+    let isDuplicate = false;
+
+    if (existingItem) {
+      isDuplicate = true;
+      status = '<span class="warning">⚠️ 重复</span>';
+      
+      // 判断具体是哪个重复了
+      if (existingItem.id === productId && existingItem.channel === channelId) {
+        remark = "商品ID和渠道ID均重复";
+      } else if (existingItem.id === productId) {
+        remark = "商品ID重复";
+      } else {
+        remark = "渠道ID重复";
+      }
+    }
+
+    parsedData.push({ 
+      id: productId, 
+      channel: channelId, 
+      url: url, 
+      source: sourceName, 
+      status: status, 
+      remark: remark, // 存储说明信息
+      isDuplicate: isDuplicate 
+    });
+    
+    renderResults();
+  }
+
+  function renderResults() {
+    if (parsedData.length === 0) return;
+    const total = parsedData.length;
+    const duplicates = parsedData.filter(item => item.isDuplicate).length;
+    document.getElementById('total').textContent = total;
+    document.getElementById('duplicates').textContent = duplicates;
+    statsBox.style.display = 'block';
+
+    let html = `<table>
+      <thead>
+        <tr>
+          <th>状态</th>
+          <th>商品ID</th>
+          <th>渠道ID</th>
+          <th>说明</th> 
+        </tr>
+      </thead>
+      <tbody>`;
+
+    [...parsedData].reverse().forEach(item => {
+      html += `<tr>
+        <td>${item.status}</td>
+        <td><div class="chip">${item.id}</div></td>
+        <td><div class="chip">${item.channel}</div></td>
+        <td>${item.remark}</td> <!-- 显示说明 -->
+      </tr>`;
+    });
+    
+    html += `</tbody></table>`;
+    resultArea.innerHTML = html;
+  }
+</script>
+</body>
+</html>
